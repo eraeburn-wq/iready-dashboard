@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>iReady Proficiency Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #1e1e2f; color: #fff; margin: 0; padding: 0; }
+
+header {
+    padding: 25px;
+    text-align: center;
+    background: #27293d;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #aaa;
+    font-size: 16px;
+    gap: 16px;
+}
+
+.spinner {
+    width: 40px; height: 40px;
+    border: 4px solid #3a3a4f;
+    border-top-color: #4c8bf5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.tabs { display: flex; gap: 10px; padding: 8px 20px; flex-wrap: wrap; align-items: center; }
+.tabs-label { color: #aaa; font-size: 13px; min-width: 60px; }
+.tab { background: #2d2f40; padding: 8px 18px; border-radius: 6px; cursor: pointer; user-select: none; font-size: 14px; transition: background 0.2s; }
+.tab.active { background: #4c8bf5; }
+.tab:hover:not(.active) { background: #3a3d55; }
+
+.card-container { display: flex; gap: 20px; padding: 20px; flex-wrap: wrap; }
+.card { background: #2d2f40; padding: 20px; border-radius: 10px; flex: 1; min-width: 200px; }
+.card h3 { margin-top: 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
+.big-num { font-size: 34px; font-weight: bold; color: #fff; margin-top: 4px; }
+
+.chart-box { background: #2d2f40; margin: 20px; padding: 20px; border-radius: 10px; }
+.chart-box h3 { margin-top: 0; font-size: 15px; color: #ccc; border-bottom: 1px solid #3a3a4f; padding-bottom: 10px; margin-bottom: 16px; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 11px 12px; border-bottom: 1px solid #3a3a4f; text-align: left; font-size: 14px; }
+th { color: #4c8bf5; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+tr:hover td { background: #33364f; }
+
+.pct-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.pct-bar-bg { flex: 1; background: #3a3a55; border-radius: 4px; height: 8px; overflow: hidden; }
+.pct-bar-fill { height: 8px; border-radius: 4px; background: #4c8bf5; }
+
+hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
+.empty-state { padding: 30px 20px; color: #aaa; font-size: 15px; line-height: 1.8; }
+
+.config-banner {
+    background: #2d2f40;
+    border: 2px dashed #4c8bf5;
+    border-radius: 10px;
+    margin: 20px;
+    padding: 24px;
+    font-size: 14px;
+    line-height: 1.9;
+    color: #ccc;
+}
+.config-banner h2 { margin-top: 0; color: #4c8bf5; }
+.config-banner code {
+    background: #1e1e2f;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #fff;
+}
+.config-banner ol { padding-left: 20px; }
+.config-banner li { margin-bottom: 8px; }
+
+.last-updated {
+    text-align: right;
+    padding: 6px 24px 0;
+    font-size: 12px;
+    color: #555;
+}
+
+/* School filter dropdown */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 20px 0;
+    flex-wrap: wrap;
+}
+.filter-bar label { color: #aaa; font-size: 13px; }
+.filter-bar select {
+    background: #2d2f40;
+    color: #fff;
+    border: 1px solid #3a3a4f;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 14px;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<header>📊 iReady Projected Proficiency Dashboard</header>
+
+<!-- SETUP INSTRUCTIONS -->
+<div class="config-banner" id="setupBanner" style="display:none;">
+    <h2>🛠️ One-Time Setup Required</h2>
+    <p>This dashboard reads live data from a Google Sheet. Follow these steps once:</p>
+    <ol>
+        <li>
+            <strong>Create your Google Sheet</strong> with these 6 tab names (exact spelling):<br>
+            <code>Reading Fall</code> &nbsp; <code>Reading Winter</code> &nbsp; <code>Reading Spring</code><br>
+            <code>Math Fall</code> &nbsp; <code>Math Winter</code> &nbsp; <code>Math Spring</code>
+        </li>
+        <li>
+            Each tab should have columns: <code>School</code>, <code>Grade</code>, and all the standard iReady proficiency columns.<br>
+            Each row = one school + grade combination (e.g. Bryan Co ES, Grade 3).
+        </li>
+        <li><strong>Share the Sheet:</strong> Click <em>Share → Anyone with the link → Viewer</em>.</li>
+        <li>
+            <strong>Copy your Sheet ID</strong> from the URL:<br>
+            <code>https://docs.google.com/spreadsheets/d/<strong>1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY"</strong>/edit</code>
+        </li>
+        <li>
+            Open this HTML file in a text editor, find:<br>
+            <code>const SHEET_ID = 1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY";</code><br>
+            Replace with your actual Sheet ID and save.
+        </li>
+        <li>
+            <strong>Host on GitHub Pages</strong> for a permanent shareable URL:
+            <ol>
+                <li>Go to <a href="https://github.com" style="color:#4c8bf5">github.com</a>, create a free account, make a new <strong>Public</strong> repository named <code>iready-dashboard</code>.</li>
+                <li>Upload this file, rename it <code>index.html</code>, commit it.</li>
+                <li>Go to <em>Settings → Pages → Source: main → / (root) → Save</em>.</li>
+                <li>Your live URL: <code>https://YOUR-USERNAME.github.io/iready-dashboard</code></li>
+            </ol>
+        </li>
+        <li><strong>Update data anytime:</strong> Just paste new rows into your Google Sheet — everyone sees it instantly.</li>
+    </ol>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboardUI" style="display:none;">
+    <div class="last-updated" id="lastUpdated"></div>
+
+    <div class="tabs" id="subjectTabs">
+        <span class="tabs-label">Subject:</span>
+        <div class="tab active" onclick="selectSubject('Reading')">Reading</div>
+        <div class="tab" onclick="selectSubject('Math')">Math</div>
+    </div>
+
+    <div class="tabs" id="termTabs">
+        <span class="tabs-label">Term:</span>
+        <div class="tab active" onclick="selectTerm('Fall')">Fall</div>
+        <div class="tab" onclick="selectTerm('Winter')">Winter</div>
+        <div class="tab" onclick="selectTerm('Spring')">Spring</div>
+    </div>
+
+    <div class="tabs" id="viewTabs">
+        <span class="tabs-label">View:</span>
+        <div class="tab active" onclick="selectView('School')">By School</div>
+        <div class="tab" onclick="selectView('Grade')">By Grade</div>
+        <div class="tab" onclick="selectView('SchoolGrade')">School + Grade</div>
+        <div class="tab" onclick="selectView('District')">District Total</div>
+        <div class="tab" onclick="selectView('Bands')">Grade Bands</div>
+    </div>
+
+    <!-- School filter (shown only in School+Grade view) -->
+    <div class="filter-bar" id="schoolFilterBar" style="display:none;">
+        <label>Filter by School:</label>
+        <select id="schoolFilter" onchange="renderDashboard()">
+            <option value="ALL">All Schools</option>
+        </select>
+    </div>
+
+    <hr class="divider">
+    <div id="dashboardContent"></div>
+</div>
+
+<div class="loading-screen" id="loadingScreen" style="display:none;">
+    <div class="spinner"></div>
+    <div id="loadingMsg">Loading data from Google Sheets...</div>
+</div>
+
+<script>
+// ============================================================
+// ✏️  CONFIGURATION
+// ============================================================
+const SHEET_ID = "1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY";
+
+const TABS = [
+    ["Reading", "Fall",   "Reading Fall"],
+    ["Reading", "Winter", "Reading Winter"],
+    ["Reading", "Spring", "Reading Spring"],
+    ["Math",    "Fall",   "Math Fall"],
+    ["Math",    "Winter", "Math Winter"],
+    ["Math",    "Spring", "Math Spring"],
+];
+
+// ============================================================
+// STATE
+// Raw store: each entry is an array of {School, Grade, ...counts}
+// ============================================================
+let rawStore = {
+    Reading: { Fall: [], Winter: [], Spring: [] },
+    Math:    { Fall: [], Winter: [], Spring: [] }
+};
+
+let currentSubject = "Reading";
+let currentTerm    = "Fall";
+let currentView    = "School";
+
+// ============================================================
+// FETCH SHEET TAB
+// ============================================================
+async function fetchSheetTab(tabName) {
+    const url  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
+    const res  = await fetch(url);
+    const text = await res.text();
+    const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/)[1]);
+    const table = json.table;
+    if (!table || !table.cols || !table.rows) return [];
+    const headers = table.cols.map(c => c.label || c.id);
+    return table.rows
+        .filter(row => row.c && row.c.some(cell => cell && cell.v !== null))
+        .map(row => {
+            const obj = {};
+            row.c.forEach((cell, i) => { obj[headers[i]] = cell ? cell.v : null; });
+            return obj;
+        });
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function parsePct(val) {
+    if (val === undefined || val === null || val === "") return 0;
+    const s = String(val).trim().replace("%", "");
+    const n = parseFloat(s);
+    if (isNaN(n)) return 0;
+    return n > 1 ? n / 100 : n;
+}
+
+function determineBand(name) {
+    const u = String(name).toUpperCase();
+    if (u.includes(" ES")) return "Elementary";
+    if (u.includes(" MS")) return "Middle";
+    return "Other";
+}
+
+function normalizeRawRow(row) {
+    const school    = String(row["School"] || "").trim();
+    const gradeRaw  = row["Grade"] ?? row["grade"] ?? row["GRADE"] ?? "";
+    const gradeStr  = String(gradeRaw).trim();
+
+    return {
+        School:          school,
+        Grade:           gradeStr,
+        Band:            determineBand(school),
+        ProficientPct:   parsePct(row["% Proficient (Level 4 + 3)"]),
+        ProficientCount: Number(row["# Proficient (Level 4 + 3)"]) || 0,
+        Level4Pct:       parsePct(row["% Level 4"]),
+        Level4Count:     Number(row["# Level 4"]) || 0,
+        Level3Pct:       parsePct(row["% Level 3"]),
+        Level3Count:     Number(row["# Level 3"]) || 0,
+        Level2Pct:       parsePct(row["% Level 2"]),
+        Level2Count:     Number(row["# Level 2"]) || 0,
+        Level1Pct:       parsePct(row["% Level 1"]),
+        Level1Count:     Number(row["# Level 1"]) || 0,
+        StudentsWithProjection: Number(row["Students with Projection"]) || 0,
+        Total:           Number(row["Total"]) || 0,
+    };
+}
+
+// Aggregate a list of raw rows into one summary row with a given label
+function aggregateRows(rows, label) {
+    if (!rows || !rows.length) return null;
+    let s = {
+        School: label, Grade: "",
+        ProficientCount: 0, Level4Count: 0, Level3Count: 0,
+        Level2Count: 0, Level1Count: 0, Total: 0
+    };
+    rows.forEach(r => {
+        s.ProficientCount += r.ProficientCount;
+        s.Level4Count     += r.Level4Count;
+        s.Level3Count     += r.Level3Count;
+        s.Level2Count     += r.Level2Count;
+        s.Level1Count     += r.Level1Count;
+        s.Total           += r.Total;
+    });
+    s.ProficientPct = s.Total > 0 ? s.ProficientCount / s.Total : 0;
+    return s;
+}
+
+// ============================================================
+// VIEWS — produce display-ready records from raw data
+// ============================================================
+
+// BY SCHOOL: aggregate all grades per school
+function getBySchool(rows) {
+    const schools = [...new Set(rows.map(r => r.School))].filter(Boolean);
+    return schools.map(school => {
+        const schoolRows = rows.filter(r => r.School === school);
+        return aggregateRows(schoolRows, school);
+    }).filter(Boolean);
+}
+
+// BY GRADE: aggregate all schools per grade
+function getByGrade(rows) {
+    const grades = [...new Set(rows.map(r => r.Grade))].filter(Boolean);
+    const sorted = grades.sort((a, b) => {
+        if (String(a).toUpperCase() === "K") return -1;
+        if (String(b).toUpperCase() === "K") return 1;
+        return parseInt(a) - parseInt(b) || String(a).localeCompare(String(b));
+    });
+    return sorted.map(grade => {
+        const gradeRows = rows.filter(r => r.Grade === grade);
+        const label = "Grade " + grade;
+        return aggregateRows(gradeRows, label);
+    }).filter(Boolean);
+}
+
+// DISTRICT: all rows collapsed to one
+function getDistrict(rows) {
+    return [aggregateRows(rows, "District Total")].filter(Boolean);
+}
+
+// BY BAND
+function getByBand(rows) {
+    const bands = ["Elementary", "Middle", "Other"];
+    return bands.map(band => {
+        const bandRows = rows.filter(r => r.Band === band);
+        if (!bandRows.length) return null;
+        return aggregateRows(bandRows, band + " Schools");
+    }).filter(x => x && x.Total > 0);
+}
+
+// SCHOOL + GRADE (drill-down): rows for one school, broken by grade
+function getSchoolByGrade(rows, school) {
+    const filtered = school === "ALL" ? rows : rows.filter(r => r.School === school);
+    if (school === "ALL") return getBySchool(rows); // fallback
+    const grades = [...new Set(filtered.map(r => r.Grade))].filter(Boolean)
+        .sort((a, b) => {
+            if (String(a).toUpperCase() === "K") return -1;
+            if (String(b).toUpperCase() === "K") return 1;
+            return parseInt(a) - parseInt(b);
+        });
+    return grades.map(grade => {
+        const r = filtered.find(row => row.Grade === grade);
+        if (!r) return null;
+        return {
+            ...r,
+            School: "Grade " + grade,
+            ProficientPct: r.ProficientPct
+        };
+    }).filter(Boolean);
+}
+
+// ============================================================
+// POPULATE SCHOOL FILTER DROPDOWN
+// ============================================================
+function populateSchoolFilter(rows) {
+    const select = document.getElementById("schoolFilter");
+    const schools = [...new Set(rows.map(r => r.School))].filter(Boolean).sort();
+    select.innerHTML = `<option value="ALL">All Schools</option>`;
+    schools.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s; opt.textContent = s;
+        select.appendChild(opt);
+    });
+}
+
+// ============================================================
+// LOAD DATA
+// ============================================================
+async function loadAllData() {
+    if (SHEET_ID === "YOUR_SHEET_ID_HERE") {
+        document.getElementById("setupBanner").style.display = "block";
+        document.getElementById("loadingScreen").style.display = "none";
+        return;
+    }
+
+    document.getElementById("setupBanner").style.display = "none";
+    document.getElementById("loadingScreen").style.display = "flex";
+    document.getElementById("dashboardUI").style.display = "none";
+
+    try {
+        for (const [subj, term, tabName] of TABS) {
+            document.getElementById("loadingMsg").textContent = `Loading ${tabName}...`;
+            try {
+                const rows = await fetchSheetTab(tabName);
+                rawStore[subj][term] = rows
+                    .filter(r => r["School"] || r["Grade"])
+                    .map(normalizeRawRow)
+                    .filter(r => r.Total > 0 || r.ProficientCount > 0);
+            } catch(e) {
+                console.warn(`Could not load "${tabName}":`, e.message);
+            }
+        }
+
+        document.getElementById("lastUpdated").textContent =
+            "Last loaded: " + new Date().toLocaleString();
+        document.getElementById("loadingScreen").style.display = "none";
+        document.getElementById("dashboardUI").style.display = "block";
+        renderDashboard();
+
+    } catch(err) {
+        document.getElementById("loadingMsg").textContent =
+            "❌ Error: " + err.message + ". Check your Sheet ID and make sure the Sheet is public.";
+    }
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function selectSubject(s) { currentSubject = s; updateActiveTabs("subjectTabs", s); renderDashboard(); }
+function selectTerm(t)    { currentTerm    = t; updateActiveTabs("termTabs",    t); renderDashboard(); }
+function selectView(v)    { currentView    = v; updateActiveTabs("viewTabs",    v); renderDashboard(); }
+
+function updateActiveTabs(id, active) {
+    document.getElementById(id).querySelectorAll(".tab").forEach(tab => {
+        tab.classList.toggle("active", tab.textContent.trim() === active);
+    });
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+let chart1, chart2, chart3;
+function destroyCharts() {
+    [chart1, chart2, chart3].forEach(c => { if (c) c.destroy(); });
+    chart1 = chart2 = chart3 = null;
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function renderDashboard() {
+    const container = document.getElementById("dashboardContent");
+    container.innerHTML = "";
+    destroyCharts();
+
+    const rows = rawStore[currentSubject][currentTerm];
+    const filterBar = document.getElementById("schoolFilterBar");
+
+    // Show/hide school filter
+    if (currentView === "SchoolGrade") {
+        filterBar.style.display = "flex";
+        populateSchoolFilter(rows);
+    } else {
+        filterBar.style.display = "none";
+    }
+
+    if (!rows || !rows.length) {
+        container.innerHTML = `<div class="empty-state">No data for <strong>${currentSubject} – ${currentTerm}</strong>.<br>Make sure the <strong>${currentSubject} ${currentTerm}</strong> tab exists in your Google Sheet and has data.</div>`;
+        return;
+    }
+
+    let records, rowLabel, titleSuffix;
+
+    switch(currentView) {
+        case "School":
+            records    = getBySchool(rows);
+            rowLabel   = "School";
+            titleSuffix = "by School";
+            break;
+        case "Grade":
+            records    = getByGrade(rows);
+            rowLabel   = "Grade";
+            titleSuffix = "by Grade";
+            break;
+        case "District":
+            records    = getDistrict(rows);
+            rowLabel   = "District";
+            titleSuffix = "District Total";
+            break;
+        case "Bands":
+            records    = getByBand(rows);
+            rowLabel   = "Band";
+            titleSuffix = "by Grade Band";
+            break;
+        case "SchoolGrade": {
+            const school = document.getElementById("schoolFilter").value;
+            if (school === "ALL") {
+                records    = getBySchool(rows);
+                rowLabel   = "School";
+                titleSuffix = "by School";
+            } else {
+                records    = getSchoolByGrade(rows, school);
+                rowLabel   = "Grade";
+                titleSuffix = school + " by Grade";
+            }
+            break;
+        }
+    }
+
+    if (!records || !records.length) {
+        container.innerHTML = `<div class="empty-state">No data for this view.</div>`;
+        return;
+    }
+
+    container.appendChild(buildMetricCards(records));
+    container.appendChild(buildBarChart("chart1", records, `${currentSubject} – ${currentTerm} | % Proficient ${titleSuffix}`));
+    container.appendChild(buildStackedChart("chart2", records, `Level Distribution ${titleSuffix}`));
+    container.appendChild(buildTable(records, rowLabel));
+
+    // Growth chart uses school-aggregated data across terms
+    const growth = buildGrowthSection();
+    if (growth) container.appendChild(growth);
+}
+
+// ============================================================
+// UI COMPONENTS
+// ============================================================
+function buildMetricCards(records) {
+    const total = records.reduce((s, r) => s + r.Total, 0);
+    const prof  = records.reduce((s, r) => s + r.ProficientCount, 0);
+    const pct   = total > 0 ? (prof / total * 100).toFixed(1) : 0;
+    const w = document.createElement("div");
+    w.className = "card-container";
+    w.innerHTML = `
+        <div class="card"><h3>Total Students</h3><div class="big-num">${total.toLocaleString()}</div></div>
+        <div class="card"><h3># Proficient (Levels 3 + 4)</h3><div class="big-num">${prof.toLocaleString()}</div></div>
+        <div class="card"><h3>% Proficient</h3><div class="big-num">${pct}%</div></div>`;
+    return w;
+}
+
+function buildBarChart(canvasId, records, title) {
+    const box = document.createElement("div");
+    box.className = "chart-box";
+    box.innerHTML = `<h3>${title}</h3><canvas id="${canvasId}"></canvas>`;
+    setTimeout(() => {
+        const data   = records.map(r => parseFloat((r.ProficientPct * 100).toFixed(1)));
+        const colors = data.map(v => v >= 60 ? "#33cc66" : v >= 40 ? "#ffcc00" : "#ff6b6b");
+        chart1 = new Chart(document.getElementById(canvasId), {
+            type: "bar",
+            data: { labels: records.map(r => r.School), datasets: [{ label: "% Proficient", data, backgroundColor: colors }] },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, max: 100, ticks: { color: "#fff", callback: v => v + "%" } },
+                    x: { ticks: { color: "#fff" } }
+                }
+            }
+        });
+    });
+    return box;
+}
+
+function buildStackedChart(canvasId, records, title) {
+    const box = document.createElement("div");
+    box.className = "chart-box";
+    box.innerHTML = `<h3>${title}</h3><canvas id="${canvasId}"></canvas>`;
+    setTimeout(() => {
+        chart2 = new Chart(document.getElementById(canvasId), {
+            type: "bar",
+            data: {
+                labels: records.map(r => r.School),
+                datasets: [
+                    { label: "Level 4", data: records.map(r => r.Level4Count), backgroundColor: "#1f77ff" },
+                    { label: "Level 3", data: records.map(r => r.Level3Count), backgroundColor: "#33cc66" },
+                    { label: "Level 2", data: records.map(r => r.Level2Count), backgroundColor: "#ffcc00" },
+                    { label: "Level 1", data: records.map(r => r.Level1Count), backgroundColor: "#ff6b6b" }
+                ]
+            },
+            options: {
+                plugins: { legend: { labels: { color: "#fff" } } },
+                responsive: true,
+                scales: {
+                    x: { stacked: true, ticks: { color: "#fff" } },
+                    y: { stacked: true, ticks: { color: "#fff" } }
+                }
+            }
+        });
+    });
+    return box;
+}
+
+function buildTable(records, rowLabel) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "chart-box";
+    let html = `<h3>Data Table</h3>
+        <table><thead><tr>
+            <th>${rowLabel}</th><th>Total</th><th># Proficient</th>
+            <th>% Proficient</th><th>Level 4</th><th>Level 3</th><th>Level 2</th><th>Level 1</th>
+        </tr></thead><tbody>`;
+    records.forEach(r => {
+        const pct = (r.ProficientPct * 100).toFixed(1);
+        const w   = Math.min(100, Math.max(0, parseFloat(pct)));
+        html += `<tr>
+            <td>${r.School}</td>
+            <td>${r.Total.toLocaleString()}</td>
+            <td>${r.ProficientCount.toLocaleString()}</td>
+            <td><div class="pct-bar-wrap">
+                <div class="pct-bar-bg"><div class="pct-bar-fill" style="width:${w}%"></div></div>
+                <span>${pct}%</span>
+            </div></td>
+            <td>${r.Level4Count.toLocaleString()}</td>
+            <td>${r.Level3Count.toLocaleString()}</td>
+            <td>${r.Level2Count.toLocaleString()}</td>
+            <td>${r.Level1Count.toLocaleString()}</td>
+        </tr>`;
+    });
+    html += `</tbody></table>`;
+    wrapper.innerHTML = html;
+    return wrapper;
+}
+
+function buildGrowthSection() {
+    const terms     = ["Fall", "Winter", "Spring"];
+    const available = terms.filter(t => rawStore[currentSubject][t].length > 0);
+    if (available.length < 2) return null;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "chart-box";
+    wrapper.innerHTML = `<h3>Proficiency Growth Across Terms</h3><canvas id="chart3"></canvas>`;
+
+    const labels = [], values = [];
+    available.forEach(term => {
+        const recs  = rawStore[currentSubject][term];
+        const total = recs.reduce((s, r) => s + r.Total, 0);
+        const prof  = recs.reduce((s, r) => s + r.ProficientCount, 0);
+        labels.push(term);
+        values.push(total > 0 ? parseFloat((prof / total * 100).toFixed(1)) : 0);
+    });
+
+    setTimeout(() => {
+        chart3 = new Chart(document.getElementById("chart3"), {
+            type: "line",
+            data: {
+                labels,
+                datasets: [{
+                    label: "% Proficient", data: values,
+                    borderColor: "#4c8bf5", backgroundColor: "rgba(76,139,245,0.15)",
+                    fill: true, tension: 0.3, pointRadius: 7, pointBackgroundColor: "#4c8bf5"
+                }]
+            },
+            options: {
+                plugins: { legend: { labels: { color: "#fff" } } },
+                scales: {
+                    y: { beginAtZero: true, max: 100, ticks: { color: "#fff", callback: v => v + "%" } },
+                    x: { ticks: { color: "#fff" } }
+                }
+            }
+        });
+    });
+    return wrapper;
+}
+
+// ============================================================
+// START
+// ============================================================
+loadAllData();
+</script>
+</body>
+</html>
