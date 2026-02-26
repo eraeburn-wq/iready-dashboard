@@ -131,11 +131,11 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
         <li><strong>Share the Sheet:</strong> Click <em>Share → Anyone with the link → Viewer</em>.</li>
         <li>
             <strong>Copy your Sheet ID</strong> from the URL:<br>
-            <code>https://docs.google.com/spreadsheets/d/<strong>1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY"</strong>/edit</code>
+            <code>https://docs.google.com/spreadsheets/d/<strong>YOUR_ID_HERE</strong>/edit</code>
         </li>
         <li>
             Open this HTML file in a text editor, find:<br>
-            <code>const SHEET_ID = 1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY";</code><br>
+            <code>const SHEET_ID = "YOUR_SHEET_ID_HERE";</code><br>
             Replace with your actual Sheet ID and save.
         </li>
         <li>
@@ -170,11 +170,11 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
 
     <div class="tabs" id="viewTabs">
         <span class="tabs-label">View:</span>
-        <div class="tab active" onclick="selectView('School')">By School</div>
-        <div class="tab" onclick="selectView('Grade')">By Grade</div>
-        <div class="tab" onclick="selectView('SchoolGrade')">School + Grade</div>
-        <div class="tab" onclick="selectView('District')">District Total</div>
-        <div class="tab" onclick="selectView('Bands')">Grade Bands</div>
+        <div class="tab active" onclick="selectView('School')">School</div>
+        <div class="tab" onclick="selectView('Grade')">Grade</div>
+        <div class="tab" onclick="selectView('SchoolGrade')">School+Grade</div>
+        <div class="tab" onclick="selectView('District')">District</div>
+        <div class="tab" onclick="selectView('Bands')">Bands</div>
     </div>
 
     <!-- School filter (shown only in School+Grade view) -->
@@ -431,7 +431,10 @@ function selectView(v)    { currentView    = v; updateActiveTabs("viewTabs",    
 
 function updateActiveTabs(id, active) {
     document.getElementById(id).querySelectorAll(".tab").forEach(tab => {
-        tab.classList.toggle("active", tab.textContent.trim() === active);
+        const onclick = tab.getAttribute("onclick") || "";
+        const matchesOnclick = onclick.includes("'" + active + "'") || onclick.includes('"' + active + '"');
+        const matchesText = tab.textContent.trim() === active;
+        tab.classList.toggle("active", matchesOnclick || matchesText);
     });
 }
 
