@@ -137,7 +137,7 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
         </li>
         <li>
             Open this HTML file in Notepad, find:<br>
-            <code>const SHEET_ID = "1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY";</code><br>
+            <code>const SHEET_ID = "YOUR_SHEET_ID_HERE";</code><br>
             Replace with your actual Sheet ID and save.
         </li>
         <li>Upload to GitHub Pages for a permanent shareable link.</li>
@@ -251,7 +251,14 @@ async function fetchSheetTab(tabName) {
         .filter(row => row.c && row.c.some(cell => cell && cell.v !== null))
         .map(row => {
             const obj = {};
-            row.c.forEach((cell, i) => { obj[headers[i]] = cell ? String(cell.v ?? "").trim() : ""; });
+            row.c.forEach((cell, i) => {
+                if (!cell || cell.v === null || cell.v === undefined) {
+                    obj[headers[i]] = "";
+                } else {
+                    // Use formatted value (f) if available, otherwise convert value (v) to string
+                    obj[headers[i]] = String(cell.f !== undefined && cell.f !== null ? cell.f : cell.v).trim();
+                }
+            });
             return obj;
         });
 }
@@ -340,17 +347,28 @@ function aggregateStudents(rows, label) {
 // VIEW BUILDERS
 // ============================================================
 function getBySchool(rows) {
-    const schools = [...new Set(rows.map(r => r["School"]))].filter(Boolean).sort();
-    return schools.map(s => aggregateStudents(rows.filter(r => r["School"] === s), s)).filter(Boolean);
+    const schools = [...new Set(rows.map(r => String(r["School"] || "").trim()))].filter(Boolean).sort();
+    return schools.map(s => aggregateStudents(rows.filter(r => String(r["School"]||"").trim() === s), s)).filter(Boolean);
+}
+
+function normalizeGrade(g) {
+    const s = String(g).trim();
+    // Google Sheets may return "1.0" for grade 1
+    const n = parseFloat(s);
+    if (!isNaN(n) && Number.isInteger(n)) return String(n);
+    if (!isNaN(n) && s.endsWith(".0")) return String(Math.round(n));
+    return s;
 }
 
 function getByGrade(rows) {
-    const grades = [...new Set(rows.map(r => r["Student Grade"]))].filter(Boolean);
+    const grades = [...new Set(rows.map(r => normalizeGrade(r["Student Grade"])))].filter(Boolean);
     const sorted = grades.sort((a, b) => {
-        if (a === "K") return -1; if (b === "K") return 1;
+        if (a.toUpperCase() === "K") return -1; if (b.toUpperCase() === "K") return 1;
         return parseInt(a) - parseInt(b) || a.localeCompare(b);
     });
-    return sorted.map(g => aggregateStudents(rows.filter(r => r["Student Grade"] === g), "Grade " + g)).filter(Boolean);
+    return sorted.map(g => aggregateStudents(
+        rows.filter(r => normalizeGrade(r["Student Grade"]) === g), "Grade " + g
+    )).filter(Boolean);
 }
 
 function getDistrict(rows) {
