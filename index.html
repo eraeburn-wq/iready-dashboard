@@ -26,7 +26,6 @@ header {
     font-size: 16px;
     gap: 16px;
 }
-
 .spinner {
     width: 40px; height: 40px;
     border: 4px solid #3a3a4f;
@@ -37,15 +36,36 @@ header {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .tabs { display: flex; gap: 10px; padding: 8px 20px; flex-wrap: wrap; align-items: center; }
-.tabs-label { color: #aaa; font-size: 13px; min-width: 60px; }
+.tabs-label { color: #aaa; font-size: 13px; min-width: 70px; }
 .tab { background: #2d2f40; padding: 8px 18px; border-radius: 6px; cursor: pointer; user-select: none; font-size: 14px; transition: background 0.2s; }
 .tab.active { background: #4c8bf5; }
 .tab:hover:not(.active) { background: #3a3d55; }
 
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 20px;
+    flex-wrap: wrap;
+    background: #27293d;
+    margin-bottom: 4px;
+}
+.filter-bar label { color: #aaa; font-size: 13px; white-space: nowrap; }
+.filter-bar select {
+    background: #2d2f40;
+    color: #fff;
+    border: 1px solid #4c8bf5;
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    min-width: 200px;
+}
+
 .card-container { display: flex; gap: 20px; padding: 20px; flex-wrap: wrap; }
-.card { background: #2d2f40; padding: 20px; border-radius: 10px; flex: 1; min-width: 200px; }
-.card h3 { margin-top: 0; font-size: 13px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
-.big-num { font-size: 34px; font-weight: bold; color: #fff; margin-top: 4px; }
+.card { background: #2d2f40; padding: 20px; border-radius: 10px; flex: 1; min-width: 180px; }
+.card h3 { margin-top: 0; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
+.big-num { font-size: 32px; font-weight: bold; color: #fff; margin-top: 4px; }
 
 .chart-box { background: #2d2f40; margin: 20px; padding: 20px; border-radius: 10px; }
 .chart-box h3 { margin-top: 0; font-size: 15px; color: #ccc; border-bottom: 1px solid #3a3a4f; padding-bottom: 10px; margin-bottom: 16px; }
@@ -56,10 +76,10 @@ th { color: #4c8bf5; font-size: 12px; text-transform: uppercase; letter-spacing:
 tr:hover td { background: #33364f; }
 
 .pct-bar-wrap { display: flex; align-items: center; gap: 8px; }
-.pct-bar-bg { flex: 1; background: #3a3a55; border-radius: 4px; height: 8px; overflow: hidden; }
+.pct-bar-bg { flex: 1; background: #3a3a55; border-radius: 4px; height: 8px; overflow: hidden; min-width: 60px; }
 .pct-bar-fill { height: 8px; border-radius: 4px; background: #4c8bf5; }
 
-hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
+hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
 .empty-state { padding: 30px 20px; color: #aaa; font-size: 15px; line-height: 1.8; }
 
 .config-banner {
@@ -73,40 +93,21 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
     color: #ccc;
 }
 .config-banner h2 { margin-top: 0; color: #4c8bf5; }
-.config-banner code {
-    background: #1e1e2f;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-    color: #fff;
-}
+.config-banner code { background: #1e1e2f; padding: 2px 8px; border-radius: 4px; font-size: 13px; color: #fff; }
 .config-banner ol { padding-left: 20px; }
 .config-banner li { margin-bottom: 8px; }
 
-.last-updated {
-    text-align: right;
-    padding: 6px 24px 0;
-    font-size: 12px;
-    color: #555;
-}
+.last-updated { text-align: right; padding: 6px 24px 0; font-size: 12px; color: #555; }
 
-/* School filter dropdown */
-.filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 20px 0;
-    flex-wrap: wrap;
-}
-.filter-bar label { color: #aaa; font-size: 13px; }
-.filter-bar select {
-    background: #2d2f40;
+.subgroup-tag {
+    display: inline-block;
+    background: #4c8bf5;
     color: #fff;
-    border: 1px solid #3a3a4f;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 14px;
-    cursor: pointer;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-left: 10px;
+    vertical-align: middle;
 }
 </style>
 </head>
@@ -117,16 +118,17 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
 <!-- SETUP INSTRUCTIONS -->
 <div class="config-banner" id="setupBanner" style="display:none;">
     <h2>🛠️ One-Time Setup Required</h2>
-    <p>This dashboard reads live data from a Google Sheet. Follow these steps once:</p>
+    <p>This dashboard reads live student-level data from a Google Sheet. Follow these steps:</p>
     <ol>
         <li>
-            <strong>Create your Google Sheet</strong> with these 6 tab names (exact spelling):<br>
-            <code>Reading Fall</code> &nbsp; <code>Reading Winter</code> &nbsp; <code>Reading Spring</code><br>
-            <code>Math Fall</code> &nbsp; <code>Math Winter</code> &nbsp; <code>Math Spring</code>
+            <strong>Create your Google Sheet</strong> with these 4 tab names (exact spelling):<br>
+            <code>ELA Fall</code> &nbsp; <code>ELA Winter</code> &nbsp; <code>Math Fall</code> &nbsp; <code>Math Winter</code>
         </li>
         <li>
-            Each tab should have columns: <code>School</code>, <code>Grade</code>, and all the standard iReady proficiency columns.<br>
-            Each row = one school + grade combination (e.g. Bryan Co ES, Grade 3).
+            <strong>Paste your iReady student-level CSV data</strong> into each tab — one row per student.<br>
+            Required columns: <code>School</code>, <code>Student Grade</code>, <code>Sex</code>, <code>Combined Race and Ethnicity</code>,
+            <code>English Language Learner</code>, <code>Special Education</code>, <code>Economically Disadvantaged</code>,
+            <code>504 Eligible</code>, <code>Proficiency if Student Shows No Additional Growth</code>
         </li>
         <li><strong>Share the Sheet:</strong> Click <em>Share → Anyone with the link → Viewer</em>.</li>
         <li>
@@ -134,20 +136,11 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
             <code>https://docs.google.com/spreadsheets/d/<strong>YOUR_ID_HERE</strong>/edit</code>
         </li>
         <li>
-            Open this HTML file in a text editor, find:<br>
-            <code>const SHEET_ID = "YOUR_SHEET_ID_HERE";</code><br>
+            Open this HTML file in Notepad, find:<br>
+            <code>const SHEET_ID = "1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY";</code><br>
             Replace with your actual Sheet ID and save.
         </li>
-        <li>
-            <strong>Host on GitHub Pages</strong> for a permanent shareable URL:
-            <ol>
-                <li>Go to <a href="https://github.com" style="color:#4c8bf5">github.com</a>, create a free account, make a new <strong>Public</strong> repository named <code>iready-dashboard</code>.</li>
-                <li>Upload this file, rename it <code>index.html</code>, commit it.</li>
-                <li>Go to <em>Settings → Pages → Source: main → / (root) → Save</em>.</li>
-                <li>Your live URL: <code>https://YOUR-USERNAME.github.io/iready-dashboard</code></li>
-            </ol>
-        </li>
-        <li><strong>Update data anytime:</strong> Just paste new rows into your Google Sheet — everyone sees it instantly.</li>
+        <li>Upload to GitHub Pages for a permanent shareable link.</li>
     </ol>
 </div>
 
@@ -155,9 +148,10 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
 <div id="dashboardUI" style="display:none;">
     <div class="last-updated" id="lastUpdated"></div>
 
+    <!-- SUBJECT + TERM TABS -->
     <div class="tabs" id="subjectTabs">
         <span class="tabs-label">Subject:</span>
-        <div class="tab active" onclick="selectSubject('Reading')">Reading</div>
+        <div class="tab active" onclick="selectSubject('ELA')">Reading (ELA)</div>
         <div class="tab" onclick="selectSubject('Math')">Math</div>
     </div>
 
@@ -165,7 +159,6 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
         <span class="tabs-label">Term:</span>
         <div class="tab active" onclick="selectTerm('Fall')">Fall</div>
         <div class="tab" onclick="selectTerm('Winter')">Winter</div>
-        <div class="tab" onclick="selectTerm('Spring')">Spring</div>
     </div>
 
     <div class="tabs" id="viewTabs">
@@ -175,11 +168,35 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
         <div class="tab" onclick="selectView('SchoolGrade')">School+Grade</div>
         <div class="tab" onclick="selectView('District')">District</div>
         <div class="tab" onclick="selectView('Bands')">Bands</div>
+        <div class="tab" onclick="selectView('Subgroups')">All Subgroups</div>
     </div>
 
-    <!-- School filter (shown only in School+Grade view) -->
-    <div class="filter-bar" id="schoolFilterBar" style="display:none;">
-        <label>Filter by School:</label>
+    <!-- SUBGROUP FILTER — always visible -->
+    <div class="filter-bar">
+        <label>🔍 Filter by Subgroup:</label>
+        <select id="subgroupFilter" onchange="renderDashboard()">
+            <option value="ALL">All Students</option>
+            <optgroup label="Sex">
+                <option value="SEX:male">Male</option>
+                <option value="SEX:female">Female</option>
+            </optgroup>
+            <optgroup label="Race / Ethnicity">
+                <option value="RACE:White (non-Hispanic)">White</option>
+                <option value="RACE:Black or African American (non-Hispanic)">Black or African American</option>
+                <option value="RACE:Hispanic or Latino (of any race)">Hispanic or Latino</option>
+                <option value="RACE:Asian">Asian</option>
+                <option value="RACE:Two or more Races">Two or More Races</option>
+                <option value="RACE:American Indian or Alaska Native">American Indian or Alaska Native</option>
+            </optgroup>
+            <optgroup label="Student Groups">
+                <option value="ESS:Y">ESS (Special Education)</option>
+                <option value="ELL:Y">ELL (English Language Learner)</option>
+                <option value="ED:Y">Economically Disadvantaged</option>
+                <option value="504:true">504</option>
+            </optgroup>
+        </select>
+
+        <label style="margin-left:20px;">Filter by School:</label>
         <select id="schoolFilter" onchange="renderDashboard()">
             <option value="ALL">All Schools</option>
         </select>
@@ -191,34 +208,31 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 10px 20px; }
 
 <div class="loading-screen" id="loadingScreen" style="display:none;">
     <div class="spinner"></div>
-    <div id="loadingMsg">Loading data from Google Sheets...</div>
+    <div id="loadingMsg">Loading data...</div>
 </div>
 
 <script>
 // ============================================================
 // ✏️  CONFIGURATION
 // ============================================================
-const SHEET_ID = "1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY";
+const SHEET_ID = "YOUR_SHEET_ID_HERE";
 
 const TABS = [
-    ["Reading", "Fall",   "Reading Fall"],
-    ["Reading", "Winter", "Reading Winter"],
-    ["Reading", "Spring", "Reading Spring"],
-    ["Math",    "Fall",   "Math Fall"],
-    ["Math",    "Winter", "Math Winter"],
-    ["Math",    "Spring", "Math Spring"],
+    ["ELA",  "Fall",   "ELA Fall"],
+    ["ELA",  "Winter", "ELA Winter"],
+    ["Math", "Fall",   "Math Fall"],
+    ["Math", "Winter", "Math Winter"],
 ];
 
 // ============================================================
-// STATE
-// Raw store: each entry is an array of {School, Grade, ...counts}
+// STATE — raw student rows
 // ============================================================
 let rawStore = {
-    Reading: { Fall: [], Winter: [], Spring: [] },
-    Math:    { Fall: [], Winter: [], Spring: [] }
+    ELA:  { Fall: [], Winter: [] },
+    Math: { Fall: [], Winter: [] }
 };
 
-let currentSubject = "Reading";
+let currentSubject = "ELA";
 let currentTerm    = "Fall";
 let currentView    = "School";
 
@@ -237,147 +251,155 @@ async function fetchSheetTab(tabName) {
         .filter(row => row.c && row.c.some(cell => cell && cell.v !== null))
         .map(row => {
             const obj = {};
-            row.c.forEach((cell, i) => { obj[headers[i]] = cell ? cell.v : null; });
+            row.c.forEach((cell, i) => { obj[headers[i]] = cell ? String(cell.v ?? "").trim() : ""; });
             return obj;
         });
 }
 
 // ============================================================
-// HELPERS
+// PROFICIENCY LEVEL from iReady placement
+// Level 4 = Grade 9+ or "Mid or Above" at grade
+// Level 3 = On grade level (Early On Grade Level)
+// Level 2 = 1 Grade Level Below
+// Level 1 = 2+ Grade Levels Below
+// We use "Proficiency if Student Shows No Additional Growth" directly
 // ============================================================
-function parsePct(val) {
-    if (val === undefined || val === null || val === "") return 0;
-    const s = String(val).trim().replace("%", "");
-    const n = parseFloat(s);
-    if (isNaN(n)) return 0;
-    return n > 1 ? n / 100 : n;
+function getProfLevel(row) {
+    const proj = row["Proficiency if Student Shows No Additional Growth"] || "";
+    if (proj === "Level 4") return 4;
+    if (proj === "Level 3") return 3;
+    if (proj === "Level 2") return 2;
+    if (proj === "Level 1") return 1;
+
+    // Fallback: derive from Overall Relative Placement
+    const rel = row["Overall Relative Placement"] || "";
+    if (rel === "Mid or Above Grade Level") return 3;
+    if (rel === "Early On Grade Level")     return 3;
+    if (rel === "1 Grade Level Below")      return 2;
+    if (rel === "2 Grade Levels Below")     return 1;
+    if (rel === "3 or More Grade Levels Below") return 1;
+    return 0;
 }
 
-function determineBand(name) {
-    const u = String(name).toUpperCase();
-    if (u.includes(" ES")) return "Elementary";
-    if (u.includes(" MS")) return "Middle";
+function determineBand(school) {
+    const u = String(school).toUpperCase();
+    if (u.includes(" ES") || u.includes(" PS")) return "Elementary";
+    if (u.includes(" MS"))                       return "Middle";
     return "Other";
 }
 
-function normalizeRawRow(row) {
-    const school    = String(row["School"] || "").trim();
-    const gradeRaw  = row["Grade"] ?? row["grade"] ?? row["GRADE"] ?? "";
-    const gradeStr  = String(gradeRaw).trim();
-
-    return {
-        School:          school,
-        Grade:           gradeStr,
-        Band:            determineBand(school),
-        ProficientPct:   parsePct(row["% Proficient (Level 4 + 3)"]),
-        ProficientCount: Number(row["# Proficient (Level 4 + 3)"]) || 0,
-        Level4Pct:       parsePct(row["% Level 4"]),
-        Level4Count:     Number(row["# Level 4"]) || 0,
-        Level3Pct:       parsePct(row["% Level 3"]),
-        Level3Count:     Number(row["# Level 3"]) || 0,
-        Level2Pct:       parsePct(row["% Level 2"]),
-        Level2Count:     Number(row["# Level 2"]) || 0,
-        Level1Pct:       parsePct(row["% Level 1"]),
-        Level1Count:     Number(row["# Level 1"]) || 0,
-        StudentsWithProjection: Number(row["Students with Projection"]) || 0,
-        Total:           Number(row["Total"]) || 0,
-    };
+// ============================================================
+// FILTER ROWS by subgroup
+// ============================================================
+function applySubgroupFilter(rows, subgroupVal) {
+    if (!subgroupVal || subgroupVal === "ALL") return rows;
+    const [type, value] = subgroupVal.split(":");
+    return rows.filter(r => {
+        switch(type) {
+            case "SEX":  return (r["Sex"] || "").toLowerCase() === value.toLowerCase();
+            case "RACE": return (r["Combined Race and Ethnicity"] || "") === value;
+            case "ESS":  return (r["Special Education"] || "").toUpperCase() === "Y";
+            case "ELL":  return (r["English Language Learner"] || "").toUpperCase() === "Y";
+            case "ED":   return (r["Economically Disadvantaged"] || "").toUpperCase() === "Y";
+            case "504":  return (r["504 Eligible"] || "").toLowerCase() === "true";
+            default:     return true;
+        }
+    });
 }
 
-// Aggregate a list of raw rows into one summary row with a given label
-function aggregateRows(rows, label) {
+function applySchoolFilter(rows, school) {
+    if (!school || school === "ALL") return rows;
+    return rows.filter(r => r["School"] === school);
+}
+
+// ============================================================
+// AGGREGATE student rows into a summary record
+// ============================================================
+function aggregateStudents(rows, label) {
     if (!rows || !rows.length) return null;
     let s = {
-        School: label, Grade: "",
-        ProficientCount: 0, Level4Count: 0, Level3Count: 0,
-        Level2Count: 0, Level1Count: 0, Total: 0
+        School: label,
+        Total: 0, ProficientCount: 0,
+        Level4Count: 0, Level3Count: 0, Level2Count: 0, Level1Count: 0
     };
     rows.forEach(r => {
-        s.ProficientCount += r.ProficientCount;
-        s.Level4Count     += r.Level4Count;
-        s.Level3Count     += r.Level3Count;
-        s.Level2Count     += r.Level2Count;
-        s.Level1Count     += r.Level1Count;
-        s.Total           += r.Total;
+        const lvl = getProfLevel(r);
+        if (lvl === 0) return; // skip rows with no projection
+        s.Total++;
+        if (lvl >= 3) s.ProficientCount++;
+        if (lvl === 4) s.Level4Count++;
+        else if (lvl === 3) s.Level3Count++;
+        else if (lvl === 2) s.Level2Count++;
+        else if (lvl === 1) s.Level1Count++;
     });
     s.ProficientPct = s.Total > 0 ? s.ProficientCount / s.Total : 0;
-    return s;
+    return s.Total > 0 ? s : null;
 }
 
 // ============================================================
-// VIEWS — produce display-ready records from raw data
+// VIEW BUILDERS
 // ============================================================
-
-// BY SCHOOL: aggregate all grades per school
 function getBySchool(rows) {
-    const schools = [...new Set(rows.map(r => r.School))].filter(Boolean);
-    return schools.map(school => {
-        const schoolRows = rows.filter(r => r.School === school);
-        return aggregateRows(schoolRows, school);
-    }).filter(Boolean);
+    const schools = [...new Set(rows.map(r => r["School"]))].filter(Boolean).sort();
+    return schools.map(s => aggregateStudents(rows.filter(r => r["School"] === s), s)).filter(Boolean);
 }
 
-// BY GRADE: aggregate all schools per grade
 function getByGrade(rows) {
-    const grades = [...new Set(rows.map(r => r.Grade))].filter(Boolean);
+    const grades = [...new Set(rows.map(r => r["Student Grade"]))].filter(Boolean);
     const sorted = grades.sort((a, b) => {
-        if (String(a).toUpperCase() === "K") return -1;
-        if (String(b).toUpperCase() === "K") return 1;
-        return parseInt(a) - parseInt(b) || String(a).localeCompare(String(b));
+        if (a === "K") return -1; if (b === "K") return 1;
+        return parseInt(a) - parseInt(b) || a.localeCompare(b);
     });
-    return sorted.map(grade => {
-        const gradeRows = rows.filter(r => r.Grade === grade);
-        const label = "Grade " + grade;
-        return aggregateRows(gradeRows, label);
-    }).filter(Boolean);
+    return sorted.map(g => aggregateStudents(rows.filter(r => r["Student Grade"] === g), "Grade " + g)).filter(Boolean);
 }
 
-// DISTRICT: all rows collapsed to one
 function getDistrict(rows) {
-    return [aggregateRows(rows, "District Total")].filter(Boolean);
+    return [aggregateStudents(rows, "District Total")].filter(Boolean);
 }
 
-// BY BAND
 function getByBand(rows) {
-    const bands = ["Elementary", "Middle", "Other"];
-    return bands.map(band => {
-        const bandRows = rows.filter(r => r.Band === band);
-        if (!bandRows.length) return null;
-        return aggregateRows(bandRows, band + " Schools");
+    return ["Elementary", "Middle", "Other"].map(band => {
+        const bandRows = rows.filter(r => determineBand(r["School"]) === band);
+        return aggregateStudents(bandRows, band + " Schools");
     }).filter(x => x && x.Total > 0);
 }
 
-// SCHOOL + GRADE (drill-down): rows for one school, broken by grade
 function getSchoolByGrade(rows, school) {
-    const filtered = school === "ALL" ? rows : rows.filter(r => r.School === school);
-    if (school === "ALL") return getBySchool(rows); // fallback
-    const grades = [...new Set(filtered.map(r => r.Grade))].filter(Boolean)
-        .sort((a, b) => {
-            if (String(a).toUpperCase() === "K") return -1;
-            if (String(b).toUpperCase() === "K") return 1;
-            return parseInt(a) - parseInt(b);
-        });
-    return grades.map(grade => {
-        const r = filtered.find(row => row.Grade === grade);
-        if (!r) return null;
-        return {
-            ...r,
-            School: "Grade " + grade,
-            ProficientPct: r.ProficientPct
-        };
-    }).filter(Boolean);
+    const filtered = school === "ALL" ? rows : rows.filter(r => r["School"] === school);
+    return getByGrade(filtered);
+}
+
+// All subgroups side by side
+function getAllSubgroups(rows) {
+    const subgroups = [
+        ["All Students",              rows],
+        ["Male",                      rows.filter(r => (r["Sex"]||"").toLowerCase() === "male")],
+        ["Female",                    rows.filter(r => (r["Sex"]||"").toLowerCase() === "female")],
+        ["White",                     rows.filter(r => r["Combined Race and Ethnicity"] === "White (non-Hispanic)")],
+        ["Black or African American", rows.filter(r => r["Combined Race and Ethnicity"] === "Black or African American (non-Hispanic)")],
+        ["Hispanic or Latino",        rows.filter(r => r["Combined Race and Ethnicity"] === "Hispanic or Latino (of any race)")],
+        ["Asian",                     rows.filter(r => r["Combined Race and Ethnicity"] === "Asian")],
+        ["Two or More Races",         rows.filter(r => r["Combined Race and Ethnicity"] === "Two or more Races")],
+        ["ESS",                       rows.filter(r => (r["Special Education"]||"").toUpperCase() === "Y")],
+        ["ELL",                       rows.filter(r => (r["English Language Learner"]||"").toUpperCase() === "Y")],
+        ["Econ. Disadvantaged",       rows.filter(r => (r["Economically Disadvantaged"]||"").toUpperCase() === "Y")],
+        ["504",                       rows.filter(r => (r["504 Eligible"]||"").toLowerCase() === "true")],
+    ];
+    return subgroups.map(([label, srows]) => aggregateStudents(srows, label)).filter(Boolean);
 }
 
 // ============================================================
-// POPULATE SCHOOL FILTER DROPDOWN
+// POPULATE SCHOOL DROPDOWN
 // ============================================================
 function populateSchoolFilter(rows) {
     const select = document.getElementById("schoolFilter");
-    const schools = [...new Set(rows.map(r => r.School))].filter(Boolean).sort();
+    const current = select.value;
+    const schools = [...new Set(rows.map(r => r["School"]))].filter(Boolean).sort();
     select.innerHTML = `<option value="ALL">All Schools</option>`;
     schools.forEach(s => {
         const opt = document.createElement("option");
         opt.value = s; opt.textContent = s;
+        if (s === current) opt.selected = true;
         select.appendChild(opt);
     });
 }
@@ -401,10 +423,8 @@ async function loadAllData() {
             document.getElementById("loadingMsg").textContent = `Loading ${tabName}...`;
             try {
                 const rows = await fetchSheetTab(tabName);
-                rawStore[subj][term] = rows
-                    .filter(r => r["School"] || r["Grade"])
-                    .map(normalizeRawRow)
-                    .filter(r => r.Total > 0 || r.ProficientCount > 0);
+                rawStore[subj][term] = rows.filter(r => r["School"] && r["Student Grade"]);
+                console.log(`${tabName}: ${rawStore[subj][term].length} students loaded`);
             } catch(e) {
                 console.warn(`Could not load "${tabName}":`, e.message);
             }
@@ -432,9 +452,8 @@ function selectView(v)    { currentView    = v; updateActiveTabs("viewTabs",    
 function updateActiveTabs(id, active) {
     document.getElementById(id).querySelectorAll(".tab").forEach(tab => {
         const onclick = tab.getAttribute("onclick") || "";
-        const matchesOnclick = onclick.includes("'" + active + "'") || onclick.includes('"' + active + '"');
-        const matchesText = tab.textContent.trim() === active;
-        tab.classList.toggle("active", matchesOnclick || matchesText);
+        tab.classList.toggle("active",
+            onclick.includes("'" + active + "'") || onclick.includes('"' + active + '"'));
     });
 }
 
@@ -455,91 +474,104 @@ function renderDashboard() {
     container.innerHTML = "";
     destroyCharts();
 
-    const rows = rawStore[currentSubject][currentTerm];
-    const filterBar = document.getElementById("schoolFilterBar");
-
-    // Show/hide school filter
-    if (currentView === "SchoolGrade") {
-        filterBar.style.display = "flex";
-        populateSchoolFilter(rows);
-    } else {
-        filterBar.style.display = "none";
-    }
+    let rows = rawStore[currentSubject][currentTerm];
 
     if (!rows || !rows.length) {
-        container.innerHTML = `<div class="empty-state">No data for <strong>${currentSubject} – ${currentTerm}</strong>.<br>Make sure the <strong>${currentSubject} ${currentTerm}</strong> tab exists in your Google Sheet and has data.</div>`;
+        container.innerHTML = `<div class="empty-state">No data for <strong>${currentSubject} – ${currentTerm}</strong>.<br>Make sure the <strong>${currentSubject} ${currentTerm}</strong> tab exists in your Google Sheet.</div>`;
         return;
     }
+
+    // Populate school dropdown
+    populateSchoolFilter(rows);
+
+    // Apply subgroup + school filters
+    const subgroupVal = document.getElementById("subgroupFilter").value;
+    const schoolVal   = document.getElementById("schoolFilter").value;
+    rows = applySubgroupFilter(rows, subgroupVal);
+    rows = applySchoolFilter(rows, schoolVal);
+
+    // Subgroup label for display
+    const subgroupLabel = document.getElementById("subgroupFilter").selectedOptions[0].text;
+    const schoolLabel   = schoolVal === "ALL" ? "" : ` — ${schoolVal}`;
 
     let records, rowLabel, titleSuffix;
 
     switch(currentView) {
         case "School":
-            records    = getBySchool(rows);
-            rowLabel   = "School";
+            records     = getBySchool(rows);
+            rowLabel    = "School";
             titleSuffix = "by School";
             break;
         case "Grade":
-            records    = getByGrade(rows);
-            rowLabel   = "Grade";
+            records     = getByGrade(rows);
+            rowLabel    = "Grade";
             titleSuffix = "by Grade";
             break;
         case "District":
-            records    = getDistrict(rows);
-            rowLabel   = "District";
+            records     = getDistrict(rows);
+            rowLabel    = "District";
             titleSuffix = "District Total";
             break;
         case "Bands":
-            records    = getByBand(rows);
-            rowLabel   = "Band";
+            records     = getByBand(rows);
+            rowLabel    = "Band";
             titleSuffix = "by Grade Band";
             break;
-        case "SchoolGrade": {
-            const school = document.getElementById("schoolFilter").value;
-            if (school === "ALL") {
-                records    = getBySchool(rows);
-                rowLabel   = "School";
-                titleSuffix = "by School";
-            } else {
-                records    = getSchoolByGrade(rows, school);
-                rowLabel   = "Grade";
-                titleSuffix = school + " by Grade";
-            }
+        case "SchoolGrade":
+            records     = getSchoolByGrade(rows, schoolVal);
+            rowLabel    = "Grade";
+            titleSuffix = schoolVal === "ALL" ? "by School" : `${schoolVal} by Grade`;
             break;
-        }
+        case "Subgroups":
+            records     = getAllSubgroups(rows);
+            rowLabel    = "Subgroup";
+            titleSuffix = "All Subgroups Comparison";
+            break;
+        default:
+            records = getBySchool(rows);
+            rowLabel = "School";
+            titleSuffix = "by School";
     }
 
     if (!records || !records.length) {
-        container.innerHTML = `<div class="empty-state">No data for this view.</div>`;
+        container.innerHTML = `<div class="empty-state">No data for this filter combination.</div>`;
         return;
     }
 
-    container.appendChild(buildMetricCards(records));
-    container.appendChild(buildBarChart("chart1", records, `${currentSubject} – ${currentTerm} | % Proficient ${titleSuffix}`));
+    const title = `${currentSubject} – ${currentTerm}${schoolLabel} | ${titleSuffix}`;
+    const subTag = subgroupVal !== "ALL" ? `<span class="subgroup-tag">${subgroupLabel}</span>` : "";
+
+    container.appendChild(buildMetricCards(records, subTag));
+    container.appendChild(buildBarChart("chart1", records, title));
     container.appendChild(buildStackedChart("chart2", records, `Level Distribution ${titleSuffix}`));
     container.appendChild(buildTable(records, rowLabel));
 
-    // Growth chart uses school-aggregated data across terms
-    const growth = buildGrowthSection();
-    if (growth) container.appendChild(growth);
+    // Growth chart (district level, respects subgroup filter)
+    if (currentView !== "Subgroups") {
+        const growth = buildGrowthSection(subgroupVal, schoolVal);
+        if (growth) container.appendChild(growth);
+    }
 }
 
 // ============================================================
-// UI COMPONENTS
+// KPI CARDS
 // ============================================================
-function buildMetricCards(records) {
+function buildMetricCards(records, subTag = "") {
     const total = records.reduce((s, r) => s + r.Total, 0);
     const prof  = records.reduce((s, r) => s + r.ProficientCount, 0);
     const pct   = total > 0 ? (prof / total * 100).toFixed(1) : 0;
     const w = document.createElement("div");
     w.className = "card-container";
     w.innerHTML = `
-        <div class="card"><h3>Total Students</h3><div class="big-num">${total.toLocaleString()}</div></div>
+        <div class="card"><h3>Total Students ${subTag}</h3><div class="big-num">${total.toLocaleString()}</div></div>
         <div class="card"><h3># Proficient (Levels 3 + 4)</h3><div class="big-num">${prof.toLocaleString()}</div></div>
         <div class="card"><h3>% Proficient</h3><div class="big-num">${pct}%</div></div>`;
     return w;
 }
 
+// ============================================================
+// BAR CHART
+// ============================================================
 function buildBarChart(canvasId, records, title) {
     const box = document.createElement("div");
     box.className = "chart-box";
@@ -562,6 +594,9 @@ function buildBarChart(canvasId, records, title) {
     return box;
 }
 
+// ============================================================
+// STACKED CHART
+// ============================================================
 function buildStackedChart(canvasId, records, title) {
     const box = document.createElement("div");
     box.className = "chart-box";
@@ -591,6 +626,9 @@ function buildStackedChart(canvasId, records, title) {
     return box;
 }
 
+// ============================================================
+// TABLE
+// ============================================================
 function buildTable(records, rowLabel) {
     const wrapper = document.createElement("div");
     wrapper.className = "chart-box";
@@ -621,22 +659,26 @@ function buildTable(records, rowLabel) {
     return wrapper;
 }
 
-function buildGrowthSection() {
-    const terms     = ["Fall", "Winter", "Spring"];
+// ============================================================
+// GROWTH CHART
+// ============================================================
+function buildGrowthSection(subgroupVal, schoolVal) {
+    const terms     = ["Fall", "Winter"];
     const available = terms.filter(t => rawStore[currentSubject][t].length > 0);
     if (available.length < 2) return null;
 
     const wrapper = document.createElement("div");
     wrapper.className = "chart-box";
-    wrapper.innerHTML = `<h3>Proficiency Growth Across Terms</h3><canvas id="chart3"></canvas>`;
+    wrapper.innerHTML = `<h3>Proficiency Growth: Fall → Winter</h3><canvas id="chart3"></canvas>`;
 
     const labels = [], values = [];
     available.forEach(term => {
-        const recs  = rawStore[currentSubject][term];
-        const total = recs.reduce((s, r) => s + r.Total, 0);
-        const prof  = recs.reduce((s, r) => s + r.ProficientCount, 0);
+        let recs = rawStore[currentSubject][term];
+        recs = applySubgroupFilter(recs, subgroupVal);
+        recs = applySchoolFilter(recs, schoolVal);
+        const agg = aggregateStudents(recs, term);
         labels.push(term);
-        values.push(total > 0 ? parseFloat((prof / total * 100).toFixed(1)) : 0);
+        values.push(agg ? parseFloat((agg.ProficientPct * 100).toFixed(1)) : 0);
     });
 
     setTimeout(() => {
@@ -647,7 +689,7 @@ function buildGrowthSection() {
                 datasets: [{
                     label: "% Proficient", data: values,
                     borderColor: "#4c8bf5", backgroundColor: "rgba(76,139,245,0.15)",
-                    fill: true, tension: 0.3, pointRadius: 7, pointBackgroundColor: "#4c8bf5"
+                    fill: true, tension: 0.3, pointRadius: 8, pointBackgroundColor: "#4c8bf5"
                 }]
             },
             options: {
