@@ -132,6 +132,15 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
     margin-left: 10px;
     vertical-align: middle;
 }
+
+.level-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+}
 </style>
 </head>
 <body>
@@ -149,7 +158,8 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
         </li>
         <li>
             <strong>Paste your iReady student-level CSV data</strong> into each tab — one row per student.<br>
-            Required columns: <code>School</code>, <code>Student Grade</code>, <code>Sex</code>, <code>Combined Race and Ethnicity</code>,
+            Required columns: <code>School</code>, <code>Student Grade</code>, <code>First Name</code>, <code>Last Name</code>,
+            <code>Sex</code>, <code>Combined Race and Ethnicity</code>,
             <code>English Language Learner</code>, <code>Special Education</code>, <code>Economically Disadvantaged</code>,
             <code>504 Eligible</code>, <code>Proficiency if Student Shows No Additional Growth</code>
         </li>
@@ -160,8 +170,7 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
         </li>
         <li>
             Open this HTML file in Notepad, find:<br>
-            <code>const SHEET_ID = "1ctBefvTlb4YtisW2a2NB7HHy6_m20d54Y2HPe9YayWY";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwnJaahrD7OrAHO_aE4mE5NnxpfaKnHi3nz6XlPrRtAJ_GNnQYo_8JGbTIzCgjL90zl/exec";</code><br>
+            <code>const SHEET_ID = "...";</code><br>
             Replace with your actual Sheet ID and save.
         </li>
         <li>Upload to GitHub Pages for a permanent shareable link.</li>
@@ -193,9 +202,10 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwnJaahrD7OrAHO
         <div class="tab" onclick="selectView('District')">District</div>
         <div class="tab" onclick="selectView('Bands')">Bands</div>
         <div class="tab" onclick="selectView('Subgroups')">All Subgroups</div>
+        <div class="tab" onclick="selectView('Students')">👤 Students</div>
     </div>
 
-    <!-- SUBGROUP FILTER — always visible -->
+    <!-- FILTERS — always visible -->
     <div class="filter-bar">
         <label>🔍 Filter by Subgroup:</label>
         <select id="subgroupFilter" onchange="renderDashboard()">
@@ -223,6 +233,11 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwnJaahrD7OrAHO
         <label style="margin-left:20px;">Filter by School:</label>
         <select id="schoolFilter" onchange="renderDashboard()">
             <option value="ALL">All Schools</option>
+        </select>
+
+        <label style="margin-left:20px;">Filter by Grade:</label>
+        <select id="gradeFilter" onchange="renderDashboard()">
+            <option value="ALL">All Grades</option>
         </select>
     </div>
 
@@ -280,7 +295,7 @@ function getProfLevel(row) {
     let proj = "";
     for (const key of Object.keys(row)) {
         const k = key.toLowerCase();
-        if (k.includes("typical growth") || 
+        if (k.includes("typical growth") ||
             k.includes("stretch growth") ||
             k.includes("no additional growth") ||
             k.includes("proficiency if") ||
@@ -336,6 +351,11 @@ function applySubgroupFilter(rows, subgroupVal) {
 function applySchoolFilter(rows, school) {
     if (!school || school === "ALL") return rows;
     return rows.filter(r => r["School"] === school);
+}
+
+function applyGradeFilter(rows, grade) {
+    if (!grade || grade === "ALL") return rows;
+    return rows.filter(r => normalizeGrade(r["Student Grade"]) === grade);
 }
 
 // ============================================================
@@ -404,9 +424,6 @@ function getByBand(rows) {
     }).filter(x => x && x.Total > 0);
 }
 
-// ============================================================
-// SCHOOL+GRADE: returns array of { school, grades[], subtotal }
-// ============================================================
 function getBySchoolAndGrade(rows) {
     const schools = [...new Set(rows.map(r => String(r["School"] || "").trim()))].filter(Boolean).sort();
     return schools.map(school => {
@@ -439,7 +456,7 @@ function getAllSubgroups(rows) {
 }
 
 // ============================================================
-// POPULATE SCHOOL DROPDOWN
+// POPULATE DROPDOWNS
 // ============================================================
 function populateSchoolFilter(rows) {
     const select = document.getElementById("schoolFilter");
@@ -452,6 +469,85 @@ function populateSchoolFilter(rows) {
         if (s === current) opt.selected = true;
         select.appendChild(opt);
     });
+}
+
+function populateGradeFilter(rows) {
+    const select = document.getElementById("gradeFilter");
+    const current = select.value;
+    const grades = [...new Set(rows.map(r => normalizeGrade(r["Student Grade"])))].filter(Boolean);
+    select.innerHTML = `<option value="ALL">All Grades</option>`;
+    sortGrades(grades).forEach(g => {
+        const opt = document.createElement("option");
+        opt.value = g; opt.textContent = "Grade " + g;
+        if (g === current) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+// ============================================================
+// STUDENT TABLE
+// ============================================================
+function buildStudentTable(rows) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "chart-box";
+
+    // Sort alphabetically by last name, then first name
+    const sorted = [...rows].sort((a, b) => {
+        const la = (a["Last Name"] || "").toLowerCase();
+        const lb = (b["Last Name"] || "").toLowerCase();
+        if (la !== lb) return la.localeCompare(lb);
+        return (a["First Name"] || "").toLowerCase().localeCompare((b["First Name"] || "").toLowerCase());
+    });
+
+    const total = sorted.length;
+    const profCount = sorted.filter(r => getProfLevel(r) >= 3).length;
+    const pct = total > 0 ? (profCount / total * 100).toFixed(1) : 0;
+
+    const levelColors = { 4: "#1f77ff", 3: "#33cc66", 2: "#e6a817", 1: "#ff6b6b" };
+    const levelBg     = { 4: "rgba(31,119,255,0.18)", 3: "rgba(51,204,102,0.18)", 2: "rgba(230,168,23,0.18)", 1: "rgba(255,107,107,0.18)" };
+
+    let html = `
+        <h3>Student List
+            <span style="color:#aaa;font-size:13px;font-weight:normal;">
+                &nbsp;${total.toLocaleString()} students &nbsp;|&nbsp; ${profCount.toLocaleString()} proficient &nbsp;|&nbsp; ${pct}%
+            </span>
+        </h3>
+        <table>
+            <thead><tr>
+                <th>Last Name</th>
+                <th>First Name</th>
+                <th>School</th>
+                <th>Grade</th>
+                <th>Level</th>
+                <th>Status</th>
+            </tr></thead>
+            <tbody>`;
+
+    sorted.forEach(r => {
+        const lvl = getProfLevel(r);
+        const color  = levelColors[lvl] || "#888";
+        const bg     = levelBg[lvl]     || "transparent";
+        const status = lvl >= 3 ? "✅ Proficient" : lvl > 0 ? "❌ Not Proficient" : "—";
+        const statusColor = lvl >= 3 ? "#33cc66" : lvl > 0 ? "#ff6b6b" : "#888";
+        const levelLabel  = lvl > 0 ? "Level " + lvl : "—";
+
+        html += `<tr>
+            <td>${r["Last Name"]  || "—"}</td>
+            <td>${r["First Name"] || "—"}</td>
+            <td>${r["School"]     || "—"}</td>
+            <td>${normalizeGrade(r["Student Grade"]) || "—"}</td>
+            <td>
+                <span class="level-badge" style="background:${bg};color:${color};border:1px solid ${color};">
+                    ${levelLabel}
+                </span>
+            </td>
+            <td style="color:${statusColor};font-size:13px;">${status}</td>
+        </tr>`;
+    });
+
+    html += `</tbody></table>`;
+    wrapper.innerHTML = html;
+    return wrapper;
 }
 
 // ============================================================
@@ -478,12 +574,11 @@ async function loadAllData() {
                 debugLines.push(`✅ ${tabName}: ${rows.length} raw rows, ${rawStore[subj][term].length} valid students`);
                 if (rows.length > 0) {
                     debugLines.push(`&nbsp;&nbsp;First row keys: ${Object.keys(rows[0]).slice(0,8).join(", ")}`);
-                    const profVal = rows[0]["Proficiency if Student Shows No Additional Growth"] || 
-                              rows[0]["Projected Proficiency"] || 
-                              rows[0]["Proficiency"] || "NOT FOUND";
-                    const relVal = rows[0]["Overall Relative Placement"] || "NOT FOUND";
+                    const profVal      = rows[0]["Proficiency if Student Shows No Additional Growth"] || rows[0]["Projected Proficiency"] || rows[0]["Proficiency"] || "NOT FOUND";
+                    const relVal       = rows[0]["Overall Relative Placement"] || "NOT FOUND";
                     const placementVal = rows[0]["Overall Placement"] || "NOT FOUND";
                     debugLines.push(`&nbsp;&nbsp;Sample: School="${rows[0]["School"]}" Grade="${rows[0]["Student Grade"]}"`);
+                    debugLines.push(`&nbsp;&nbsp;First Name="${rows[0]["First Name"] || "NOT FOUND"}" Last Name="${rows[0]["Last Name"] || "NOT FOUND"}"`);
                     debugLines.push(`&nbsp;&nbsp;Proficiency col="${profVal}" | Relative Placement="${relVal}" | Overall Placement="${placementVal}"`);
                     debugLines.push(`&nbsp;&nbsp;Computed level for first student: ${getProfLevel(rows[0])}`);
                 }
@@ -561,48 +656,58 @@ function renderDashboard() {
         return;
     }
 
+    // Populate school filter from the full unfiltered set
     populateSchoolFilter(rows);
 
     const subgroupVal = document.getElementById("subgroupFilter").value;
     const schoolVal   = document.getElementById("schoolFilter").value;
+
+    // Apply subgroup + school filter before populating grade dropdown
+    // so grade choices are relevant to the selected school
     rows = applySubgroupFilter(rows, subgroupVal);
     rows = applySchoolFilter(rows, schoolVal);
 
+    populateGradeFilter(rows);
+
+    const gradeVal = document.getElementById("gradeFilter").value;
+    rows = applyGradeFilter(rows, gradeVal);
+
     const subgroupLabel = document.getElementById("subgroupFilter").selectedOptions[0].text;
     const schoolLabel   = schoolVal === "ALL" ? "" : ` — ${schoolVal}`;
+    const gradeLabel    = gradeVal  === "ALL" ? "" : ` — Grade ${gradeVal}`;
     const subTag = subgroupVal !== "ALL" ? `<span class="subgroup-tag">${subgroupLabel}</span>` : "";
 
-    // School+Grade view gets its own special rendering
+    if (!rows.length) {
+        container.innerHTML = `<div class="empty-state">No data for this filter combination.</div>`;
+        return;
+    }
+
+    // ── STUDENTS VIEW ──────────────────────────────────────────
+    if (currentView === "Students") {
+        container.appendChild(buildMetricCards(rows, subTag, rows));
+        container.appendChild(buildStudentTable(rows));
+        return;
+    }
+
+    // ── SCHOOL+GRADE VIEW ──────────────────────────────────────
     if (currentView === "SchoolGrade") {
         const schoolGradeData = getBySchoolAndGrade(rows);
-
         if (!schoolGradeData.length) {
             container.innerHTML = `<div class="empty-state">No data for this filter combination.</div>`;
             return;
         }
-
-        const title = `${currentSubject} – ${currentTerm}${schoolLabel} | By School & Grade`;
-
-        // Metric cards using all rows
+        const title      = `${currentSubject} – ${currentTerm}${schoolLabel}${gradeLabel} | By School & Grade`;
         const allRecords = schoolGradeData.map(s => s.subtotal).filter(Boolean);
         container.appendChild(buildMetricCards(allRecords, subTag));
-
-        // Bar chart: show subtotal per school (one bar per school)
         container.appendChild(buildBarChart("chart1", allRecords, title));
-
-        // Stacked chart: same
         container.appendChild(buildStackedChart("chart2", allRecords, `Level Distribution by School`));
-
-        // Nested table: school header → grade rows → subtotal
         container.appendChild(buildSchoolGradeTable(schoolGradeData));
-
-        // Growth chart
-        const growth = buildGrowthSection(subgroupVal, schoolVal);
+        const growth = buildGrowthSection(subgroupVal, schoolVal, gradeVal);
         if (growth) container.appendChild(growth);
-
         return;
     }
 
+    // ── ALL OTHER VIEWS ────────────────────────────────────────
     let records, rowLabel, titleSuffix;
 
     switch(currentView) {
@@ -632,8 +737,8 @@ function renderDashboard() {
             titleSuffix = "All Subgroups Comparison";
             break;
         default:
-            records = getBySchool(rows);
-            rowLabel = "School";
+            records     = getBySchool(rows);
+            rowLabel    = "School";
             titleSuffix = "by School";
     }
 
@@ -642,7 +747,7 @@ function renderDashboard() {
         return;
     }
 
-    const title = `${currentSubject} – ${currentTerm}${schoolLabel} | ${titleSuffix}`;
+    const title          = `${currentSubject} – ${currentTerm}${schoolLabel}${gradeLabel} | ${titleSuffix}`;
     const isSubgroupView = currentView === "Subgroups";
 
     container.appendChild(buildMetricCards(records, subTag, isSubgroupView ? rows : null));
@@ -651,7 +756,7 @@ function renderDashboard() {
     container.appendChild(buildTable(records, rowLabel));
 
     if (currentView !== "Subgroups") {
-        const growth = buildGrowthSection(subgroupVal, schoolVal);
+        const growth = buildGrowthSection(subgroupVal, schoolVal, gradeVal);
         if (growth) container.appendChild(growth);
     }
 }
@@ -661,7 +766,7 @@ function renderDashboard() {
 // ============================================================
 function buildMetricCards(records, subTag = "", overrideRows = null) {
     let total, prof, pct;
-    if (overrideRows !== null) {
+    if (overrideRows !== null && Array.isArray(overrideRows)) {
         const agg = aggregateStudents(overrideRows, "all");
         total = agg ? agg.Total : 0;
         prof  = agg ? agg.ProficientCount : 0;
@@ -783,12 +888,7 @@ function buildSchoolGradeTable(schoolGradeData) {
         </tr></thead><tbody>`;
 
     schoolGradeData.forEach(({ school, grades, subtotal }) => {
-        // School header row
-        html += `<tr class="school-section-header">
-            <td colspan="8">🏫 ${school}</td>
-        </tr>`;
-
-        // Grade rows (indented)
+        html += `<tr class="school-section-header"><td colspan="8">🏫 ${school}</td></tr>`;
         grades.forEach(r => {
             const pct = (r.ProficientPct * 100).toFixed(1);
             const w   = Math.min(100, Math.max(0, parseFloat(pct)));
@@ -806,8 +906,6 @@ function buildSchoolGradeTable(schoolGradeData) {
                 <td>${r.Level1Count.toLocaleString()}</td>
             </tr>`;
         });
-
-        // School subtotal row
         if (subtotal) {
             const pct = (subtotal.ProficientPct * 100).toFixed(1);
             const w   = Math.min(100, Math.max(0, parseFloat(pct)));
@@ -835,7 +933,7 @@ function buildSchoolGradeTable(schoolGradeData) {
 // ============================================================
 // GROWTH CHART
 // ============================================================
-function buildGrowthSection(subgroupVal, schoolVal) {
+function buildGrowthSection(subgroupVal, schoolVal, gradeVal) {
     const terms     = ["Fall", "Winter"];
     const available = terms.filter(t => rawStore[currentSubject][t].length > 0);
     if (available.length < 2) return null;
@@ -849,6 +947,7 @@ function buildGrowthSection(subgroupVal, schoolVal) {
         let recs = rawStore[currentSubject][term];
         recs = applySubgroupFilter(recs, subgroupVal);
         recs = applySchoolFilter(recs, schoolVal);
+        recs = applyGradeFilter(recs, gradeVal);
         const agg = aggregateStudents(recs, term);
         labels.push(term);
         values.push(agg ? parseFloat((agg.ProficientPct * 100).toFixed(1)) : 0);
