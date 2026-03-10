@@ -62,6 +62,39 @@ header {
     min-width: 200px;
 }
 
+/* Student search bar */
+.student-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #1e1e2f;
+    border-bottom: 1px solid #3a3a4f;
+    flex-wrap: wrap;
+}
+.student-search-bar input {
+    background: #2d2f40;
+    color: #fff;
+    border: 1px solid #4c8bf5;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 14px;
+    min-width: 260px;
+    outline: none;
+}
+.student-search-bar input::placeholder { color: #666; }
+.student-search-bar input:focus { border-color: #7aabff; }
+.search-clear {
+    background: #3a3d55;
+    border: none;
+    color: #aaa;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.search-clear:hover { background: #4a4d65; color: #fff; }
+
 .card-container { display: flex; gap: 20px; padding: 20px; flex-wrap: wrap; }
 .card { background: #2d2f40; padding: 20px; border-radius: 10px; flex: 1; min-width: 180px; }
 .card h3 { margin-top: 0; font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -140,6 +173,72 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
     font-size: 12px;
     font-weight: bold;
     color: #fff;
+}
+
+/* ── Level group headers in student view ── */
+.level-group-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px 10px;
+    margin: 0 0 0 0;
+    border-top: 2px solid;
+    cursor: pointer;
+    user-select: none;
+}
+.level-group-header:hover { opacity: 0.85; }
+.level-group-title {
+    font-size: 16px;
+    font-weight: bold;
+}
+.level-group-count {
+    font-size: 13px;
+    opacity: 0.7;
+}
+.level-group-toggle {
+    margin-left: auto;
+    font-size: 18px;
+    opacity: 0.6;
+}
+.level-group-body { overflow: hidden; }
+
+/* Student view layout */
+.student-view-wrapper { margin: 20px; }
+.student-view-summary {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.level-summary-card {
+    flex: 1;
+    min-width: 120px;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.level-summary-card .lsc-level {
+    font-size: 13px;
+    font-weight: bold;
+    opacity: 0.9;
+}
+.level-summary-card .lsc-count {
+    font-size: 28px;
+    font-weight: bold;
+}
+.level-summary-card .lsc-pct {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.no-results-msg {
+    padding: 20px;
+    color: #888;
+    font-style: italic;
+    text-align: center;
 }
 </style>
 </head>
@@ -275,6 +374,9 @@ let rawStore = {
 let currentSubject = "ELA";
 let currentTerm    = "Fall";
 let currentView    = "School";
+
+// Track search text separately so it persists across re-renders in student view
+let studentSearchText = "";
 
 // ============================================================
 // FETCH SHEET TAB
@@ -485,69 +587,241 @@ function populateGradeFilter(rows) {
 }
 
 // ============================================================
-// STUDENT TABLE
+// STUDENT VIEW — grouped by level with search
 // ============================================================
-function buildStudentTable(rows) {
+
+const LEVEL_CONFIG = {
+    4: { label: "Level 4 — Proficient (Above Grade Level)", color: "#1f77ff", bg: "rgba(31,119,255,0.12)", border: "#1f77ff" },
+    3: { label: "Level 3 — Proficient (On Grade Level)",    color: "#33cc66", bg: "rgba(51,204,102,0.12)", border: "#33cc66" },
+    2: { label: "Level 2 — Not Yet Proficient",             color: "#e6a817", bg: "rgba(230,168,23,0.12)", border: "#e6a817" },
+    1: { label: "Level 1 — Not Yet Proficient",             color: "#ff6b6b", bg: "rgba(255,107,107,0.12)", border: "#ff6b6b" },
+};
+
+function buildStudentView(rows) {
     const wrapper = document.createElement("div");
-    wrapper.className = "chart-box";
 
-    // Sort alphabetically by last name, then first name
-    const sorted = [...rows].sort((a, b) => {
-        const la = (a["Last Name"] || "").toLowerCase();
-        const lb = (b["Last Name"] || "").toLowerCase();
-        if (la !== lb) return la.localeCompare(lb);
-        return (a["First Name"] || "").toLowerCase().localeCompare((b["First Name"] || "").toLowerCase());
-    });
+    // ── Search bar ──────────────────────────────────────────
+    const searchBar = document.createElement("div");
+    searchBar.className = "student-search-bar";
+    searchBar.innerHTML = `
+        <span style="color:#aaa;font-size:13px;white-space:nowrap;">🔎 Search students:</span>
+        <input type="text" id="studentSearchInput" placeholder="Type a name..." value="${studentSearchText}" />
+        <button class="search-clear" onclick="clearStudentSearch()">✕ Clear</button>
+        <span id="searchResultCount" style="color:#888;font-size:13px;margin-left:8px;"></span>
+    `;
+    wrapper.appendChild(searchBar);
 
-    const total = sorted.length;
-    const profCount = sorted.filter(r => getProfLevel(r) >= 3).length;
-    const pct = total > 0 ? (profCount / total * 100).toFixed(1) : 0;
+    // ── Render level groups ─────────────────────────────────
+    const groupsContainer = document.createElement("div");
+    groupsContainer.id = "studentLevelGroups";
+    wrapper.appendChild(groupsContainer);
 
-    const levelColors = { 4: "#1f77ff", 3: "#33cc66", 2: "#e6a817", 1: "#ff6b6b" };
-    const levelBg     = { 4: "rgba(31,119,255,0.18)", 3: "rgba(51,204,102,0.18)", 2: "rgba(230,168,23,0.18)", 1: "rgba(255,107,107,0.18)" };
+    renderStudentGroups(rows, groupsContainer);
 
-    let html = `
-        <h3>Student List
-            <span style="color:#aaa;font-size:13px;font-weight:normal;">
-                &nbsp;${total.toLocaleString()} students &nbsp;|&nbsp; ${profCount.toLocaleString()} proficient &nbsp;|&nbsp; ${pct}%
-            </span>
-        </h3>
-        <table>
-            <thead><tr>
-                <th>Last Name</th>
-                <th>First Name</th>
-                <th>School</th>
-                <th>Grade</th>
-                <th>Level</th>
-                <th>Status</th>
-            </tr></thead>
-            <tbody>`;
+    // Attach search listener after DOM insertion (via setTimeout)
+    setTimeout(() => {
+        const input = document.getElementById("studentSearchInput");
+        if (input) {
+            input.addEventListener("input", () => {
+                studentSearchText = input.value;
+                renderStudentGroups(rows, groupsContainer);
+            });
+            input.focus();
+        }
+    }, 0);
 
-    sorted.forEach(r => {
-        const lvl = getProfLevel(r);
-        const color  = levelColors[lvl] || "#888";
-        const bg     = levelBg[lvl]     || "transparent";
-        const status = lvl >= 3 ? "✅ Proficient" : lvl > 0 ? "❌ Not Proficient" : "—";
-        const statusColor = lvl >= 3 ? "#33cc66" : lvl > 0 ? "#ff6b6b" : "#888";
-        const levelLabel  = lvl > 0 ? "Level " + lvl : "—";
-
-        html += `<tr>
-            <td>${r["Last Name"]  || "—"}</td>
-            <td>${r["First Name"] || "—"}</td>
-            <td>${r["School"]     || "—"}</td>
-            <td>${normalizeGrade(r["Student Grade"]) || "—"}</td>
-            <td>
-                <span class="level-badge" style="background:${bg};color:${color};border:1px solid ${color};">
-                    ${levelLabel}
-                </span>
-            </td>
-            <td style="color:${statusColor};font-size:13px;">${status}</td>
-        </tr>`;
-    });
-
-    html += `</tbody></table>`;
-    wrapper.innerHTML = html;
     return wrapper;
+}
+
+function renderStudentGroups(allRows, container) {
+    container.innerHTML = "";
+
+    const search = studentSearchText.trim().toLowerCase();
+
+    // Filter by search term
+    const filtered = search
+        ? allRows.filter(r => {
+            const full = `${r["First Name"]||""} ${r["Last Name"]||""}`.toLowerCase();
+            const rev  = `${r["Last Name"]||""} ${r["First Name"]||""}`.toLowerCase();
+            return full.includes(search) || rev.includes(search);
+          })
+        : allRows;
+
+    // Update result count in search bar
+    const countEl = document.getElementById("searchResultCount");
+    if (countEl && search) {
+        countEl.textContent = `${filtered.length} student${filtered.length !== 1 ? "s" : ""} found`;
+    } else if (countEl) {
+        countEl.textContent = "";
+    }
+
+    // Group by level
+    const byLevel = { 4: [], 3: [], 2: [], 1: [], 0: [] };
+    filtered.forEach(r => {
+        const lvl = getProfLevel(r);
+        (byLevel[lvl] = byLevel[lvl] || []).push(r);
+    });
+
+    // Sort each group alpha by last name
+    const sortAlpha = arr => arr.sort((a, b) => {
+        const la = (a["Last Name"]||"").toLowerCase(), lb = (b["Last Name"]||"").toLowerCase();
+        if (la !== lb) return la.localeCompare(lb);
+        return (a["First Name"]||"").toLowerCase().localeCompare((b["First Name"]||"").toLowerCase());
+    });
+
+    const totalStudents = filtered.filter(r => getProfLevel(r) > 0).length;
+
+    // ── Summary cards ───────────────────────────────────────
+    const summary = document.createElement("div");
+    summary.className = "student-view-wrapper";
+
+    const summaryCards = document.createElement("div");
+    summaryCards.className = "student-view-summary";
+
+    [4, 3, 2, 1].forEach(lvl => {
+        const cfg   = LEVEL_CONFIG[lvl];
+        const count = (byLevel[lvl] || []).length;
+        const pct   = totalStudents > 0 ? (count / totalStudents * 100).toFixed(1) : "0.0";
+        const card  = document.createElement("div");
+        card.className = "level-summary-card";
+        card.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};`;
+        card.innerHTML = `
+            <div class="lsc-level" style="color:${cfg.color};">Level ${lvl}</div>
+            <div class="lsc-count" style="color:${cfg.color};">${count}</div>
+            <div class="lsc-pct">${pct}% of students</div>
+        `;
+        summaryCards.appendChild(card);
+    });
+
+    summary.appendChild(summaryCards);
+    container.appendChild(summary);
+
+    if (filtered.length === 0) {
+        const msg = document.createElement("div");
+        msg.className = "no-results-msg";
+        msg.textContent = search ? `No students match "${studentSearchText}".` : "No students found.";
+        container.appendChild(msg);
+        return;
+    }
+
+    // ── Level group sections ────────────────────────────────
+    [4, 3, 2, 1].forEach(lvl => {
+        const students = sortAlpha(byLevel[lvl] || []);
+        if (!students.length) return;
+
+        const cfg   = LEVEL_CONFIG[lvl];
+        const boxId = `levelGroup_${lvl}`;
+
+        const section = document.createElement("div");
+        section.className = "chart-box";
+        section.style.marginBottom = "12px";
+
+        // Header (collapsible)
+        const header = document.createElement("div");
+        header.className = "level-group-header";
+        header.style.cssText = `border-color:${cfg.border};color:${cfg.color};`;
+        header.innerHTML = `
+            <span class="level-badge" style="background:${cfg.bg};color:${cfg.color};border:1px solid ${cfg.border};font-size:14px;padding:4px 14px;">
+                Level ${lvl}
+            </span>
+            <span class="level-group-title" style="color:#fff;">${cfg.label}</span>
+            <span class="level-group-count">(${students.length} student${students.length !== 1 ? "s" : ""})</span>
+            <span class="level-group-toggle" id="${boxId}_toggle">▼</span>
+        `;
+        header.onclick = () => toggleLevelGroup(boxId);
+        section.appendChild(header);
+
+        // Table
+        const body = document.createElement("div");
+        body.className = "level-group-body";
+        body.id = boxId;
+
+        let tableHtml = `
+            <table>
+                <thead><tr>
+                    <th>#</th>
+                    <th>Last Name</th>
+                    <th>First Name</th>
+                    <th>School</th>
+                    <th>Grade</th>
+                    <th>Proficiency Status</th>
+                </tr></thead>
+                <tbody>`;
+
+        students.forEach((r, i) => {
+            const status      = lvl >= 3 ? "✅ Proficient" : "❌ Not Proficient";
+            const statusColor = lvl >= 3 ? "#33cc66" : "#ff6b6b";
+
+            // Highlight search match in name
+            const fn = r["First Name"] || "—";
+            const ln = r["Last Name"]  || "—";
+
+            tableHtml += `<tr>
+                <td style="color:#555;font-size:12px;">${i + 1}</td>
+                <td>${highlightMatch(ln, search)}</td>
+                <td>${highlightMatch(fn, search)}</td>
+                <td style="color:#ccc;">${r["School"] || "—"}</td>
+                <td style="color:#ccc;">${normalizeGrade(r["Student Grade"]) || "—"}</td>
+                <td style="color:${statusColor};font-size:13px;">${status}</td>
+            </tr>`;
+        });
+
+        tableHtml += `</tbody></table>`;
+        body.innerHTML = tableHtml;
+        section.appendChild(body);
+        container.appendChild(section);
+    });
+
+    // Unknown level rows
+    const unknowns = byLevel[0] || [];
+    if (unknowns.length) {
+        const section = document.createElement("div");
+        section.className = "chart-box";
+        section.style.opacity = "0.6";
+        section.innerHTML = `
+            <h3 style="color:#666;">No Level Assigned (${unknowns.length})</h3>
+            <table><thead><tr><th>Last Name</th><th>First Name</th><th>School</th><th>Grade</th></tr></thead>
+            <tbody>${sortAlpha(unknowns).map(r => `
+                <tr>
+                    <td>${highlightMatch(r["Last Name"]||"—", search)}</td>
+                    <td>${highlightMatch(r["First Name"]||"—", search)}</td>
+                    <td>${r["School"]||"—"}</td>
+                    <td>${normalizeGrade(r["Student Grade"])||"—"}</td>
+                </tr>`).join("")}
+            </tbody></table>`;
+        container.appendChild(section);
+    }
+}
+
+function highlightMatch(text, search) {
+    if (!search || text === "—") return text;
+    const idx = text.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return text;
+    return text.substring(0, idx)
+        + `<mark style="background:#4c8bf5;color:#fff;border-radius:3px;padding:0 2px;">${text.substring(idx, idx + search.length)}</mark>`
+        + text.substring(idx + search.length);
+}
+
+function toggleLevelGroup(id) {
+    const body   = document.getElementById(id);
+    const toggle = document.getElementById(id + "_toggle");
+    if (!body) return;
+    const isOpen = body.style.display !== "none";
+    body.style.display   = isOpen ? "none" : "";
+    toggle.textContent   = isOpen ? "▶" : "▼";
+}
+
+function clearStudentSearch() {
+    studentSearchText = "";
+    const input = document.getElementById("studentSearchInput");
+    if (input) { input.value = ""; input.focus(); }
+    // Re-render by triggering renderDashboard
+    renderDashboard();
+}
+
+// Keep legacy buildStudentTable so nothing breaks if called elsewhere
+function buildStudentTable(rows) {
+    return buildStudentView(rows);
 }
 
 // ============================================================
@@ -622,7 +896,13 @@ async function loadAllData() {
 // ============================================================
 function selectSubject(s) { currentSubject = s; updateActiveTabs("subjectTabs", s); renderDashboard(); }
 function selectTerm(t)    { currentTerm    = t; updateActiveTabs("termTabs",    t); renderDashboard(); }
-function selectView(v)    { currentView    = v; updateActiveTabs("viewTabs",    v); renderDashboard(); }
+function selectView(v)    {
+    currentView = v;
+    // Reset search when leaving student view
+    if (v !== "Students") studentSearchText = "";
+    updateActiveTabs("viewTabs", v);
+    renderDashboard();
+}
 
 function updateActiveTabs(id, active) {
     document.getElementById(id).querySelectorAll(".tab").forEach(tab => {
@@ -662,8 +942,6 @@ function renderDashboard() {
     const subgroupVal = document.getElementById("subgroupFilter").value;
     const schoolVal   = document.getElementById("schoolFilter").value;
 
-    // Apply subgroup + school filter before populating grade dropdown
-    // so grade choices are relevant to the selected school
     rows = applySubgroupFilter(rows, subgroupVal);
     rows = applySchoolFilter(rows, schoolVal);
 
@@ -685,7 +963,7 @@ function renderDashboard() {
     // ── STUDENTS VIEW ──────────────────────────────────────────
     if (currentView === "Students") {
         container.appendChild(buildMetricCards(rows, subTag, rows));
-        container.appendChild(buildStudentTable(rows));
+        container.appendChild(buildStudentView(rows));
         return;
     }
 
