@@ -111,6 +111,44 @@ header {
     min-width: 200px;
 }
 
+/* Grade checkbox pills */
+.grade-filter-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.grade-pill {
+    background: #2d2f40;
+    border: 1px solid #3a3a55;
+    color: #aaa;
+    border-radius: 20px;
+    padding: 5px 13px;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.grade-pill:hover { border-color: #4c8bf5; color: #fff; }
+.grade-pill.active {
+    background: #4c8bf5;
+    border-color: #4c8bf5;
+    color: #fff;
+    font-weight: bold;
+}
+.grade-pill.all-pill {
+    background: #2d2f40;
+    border-color: #555;
+    color: #888;
+}
+.grade-pill.all-pill.active {
+    background: #3a3d55;
+    border-color: #888;
+    color: #ccc;
+    font-weight: normal;
+}
+
 /* Student search bar */
 .student-search-bar {
     display: flex;
@@ -384,9 +422,9 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
         </select>
 
         <label style="margin-left:20px;">Filter by Grade:</label>
-        <select id="gradeFilter" onchange="renderDashboard()">
-            <option value="ALL">All Grades</option>
-        </select>
+        <div class="grade-filter-wrap" id="gradeFilterWrap">
+            <span class="grade-pill all-pill active" onclick="toggleGradePill('ALL')">All Grades</span>
+        </div>
     </div>
 
     <hr class="divider">
@@ -516,9 +554,9 @@ function applySchoolFilter(rows, school) {
     return rows.filter(r => r["School"] === school);
 }
 
-function applyGradeFilter(rows, grade) {
-    if (!grade || grade === "ALL") return rows;
-    return rows.filter(r => normalizeGrade(r["Student Grade"]) === grade);
+function applyGradeFilter(rows) {
+    if (selectedGrades.size === 0) return rows;
+    return rows.filter(r => selectedGrades.has(normalizeGrade(r["Student Grade"])));
 }
 
 // ============================================================
@@ -635,16 +673,53 @@ function populateSchoolFilter(rows) {
     if (LOCKED_SCHOOL) select.value = LOCKED_SCHOOL;
 }
 
+// Track selected grades as a Set (empty = ALL)
+let selectedGrades = new Set();
+
+function toggleGradePill(grade) {
+    if (grade === "ALL") {
+        selectedGrades.clear();
+    } else {
+        if (selectedGrades.has(grade)) {
+            selectedGrades.delete(grade);
+        } else {
+            selectedGrades.add(grade);
+        }
+    }
+    refreshGradePills();
+    renderDashboard();
+}
+
+function refreshGradePills() {
+    const wrap = document.getElementById("gradeFilterWrap");
+    if (!wrap) return;
+    wrap.querySelectorAll(".grade-pill").forEach(pill => {
+        const g = pill.dataset.grade;
+        if (g === "ALL") {
+            pill.classList.toggle("active", selectedGrades.size === 0);
+        } else {
+            pill.classList.toggle("active", selectedGrades.has(g));
+        }
+    });
+}
+
 function populateGradeFilter(rows) {
-    const select = document.getElementById("gradeFilter");
-    const current = select.value;
+    const wrap = document.getElementById("gradeFilterWrap");
+    if (!wrap) return;
+
     const grades = [...new Set(rows.map(r => normalizeGrade(r["Student Grade"])))].filter(Boolean);
-    select.innerHTML = `<option value="ALL">All Grades</option>`;
-    sortGrades(grades).forEach(g => {
-        const opt = document.createElement("option");
-        opt.value = g; opt.textContent = "Grade " + g;
-        if (g === current) opt.selected = true;
-        select.appendChild(opt);
+    const sorted = sortGrades(grades);
+
+    // Rebuild pills (keep ALL pill, replace rest)
+    wrap.innerHTML = `<span class="grade-pill all-pill${selectedGrades.size === 0 ? " active" : ""}" data-grade="ALL" onclick="toggleGradePill('ALL')">All Grades</span>`;
+
+    sorted.forEach(g => {
+        const pill = document.createElement("span");
+        pill.className = "grade-pill" + (selectedGrades.has(g) ? " active" : "");
+        pill.dataset.grade = g;
+        pill.textContent = "Gr " + g;
+        pill.onclick = () => toggleGradePill(g);
+        wrap.appendChild(pill);
     });
 }
 
@@ -1059,12 +1134,11 @@ function renderDashboard() {
 
     populateGradeFilter(rows);
 
-    const gradeVal = document.getElementById("gradeFilter").value;
-    rows = applyGradeFilter(rows, gradeVal);
+    rows = applyGradeFilter(rows);
 
     const subgroupLabel = document.getElementById("subgroupFilter").selectedOptions[0].text;
     const schoolLabel   = schoolVal === "ALL" ? "" : ` — ${schoolVal}`;
-    const gradeLabel    = gradeVal  === "ALL" ? "" : ` — Grade ${gradeVal}`;
+    const gradeLabel    = selectedGrades.size === 0 ? "" : ` — Grade${selectedGrades.size > 1 ? "s" : ""} ${[...selectedGrades].join(", ")}`;
     const subTag = subgroupVal !== "ALL" ? `<span class="subgroup-tag">${subgroupLabel}</span>` : "";
 
     if (!rows.length) {
@@ -1092,7 +1166,7 @@ function renderDashboard() {
         container.appendChild(buildBarChart("chart1", allRecords, title));
         container.appendChild(buildStackedChart("chart2", allRecords, `Level Distribution by School`));
         container.appendChild(buildSchoolGradeTable(schoolGradeData));
-        const growth = buildGrowthSection(subgroupVal, schoolVal, gradeVal);
+        const growth = buildGrowthSection(subgroupVal, schoolVal);
         if (growth) container.appendChild(growth);
         return;
     }
@@ -1146,7 +1220,7 @@ function renderDashboard() {
     container.appendChild(buildTable(records, rowLabel));
 
     if (currentView !== "Subgroups") {
-        const growth = buildGrowthSection(subgroupVal, schoolVal, gradeVal);
+        const growth = buildGrowthSection(subgroupVal, schoolVal);
         if (growth) container.appendChild(growth);
     }
 }
@@ -1323,7 +1397,7 @@ function buildSchoolGradeTable(schoolGradeData) {
 // ============================================================
 // GROWTH CHART
 // ============================================================
-function buildGrowthSection(subgroupVal, schoolVal, gradeVal) {
+function buildGrowthSection(subgroupVal, schoolVal) {
     const terms     = ["Fall", "Winter"];
     const available = terms.filter(t => rawStore[currentSubject][t].length > 0);
     if (available.length < 2) return null;
@@ -1337,7 +1411,7 @@ function buildGrowthSection(subgroupVal, schoolVal, gradeVal) {
         let recs = rawStore[currentSubject][term];
         recs = applySubgroupFilter(recs, subgroupVal);
         recs = applySchoolFilter(recs, schoolVal);
-        recs = applyGradeFilter(recs, gradeVal);
+        recs = applyGradeFilter(recs);
         const agg = aggregateStudents(recs, term);
         labels.push(term);
         values.push(agg ? parseFloat((agg.ProficientPct * 100).toFixed(1)) : 0);
