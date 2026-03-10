@@ -35,6 +35,55 @@ header {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.progress-bar-wrap {
+    width: 280px;
+    background: #3a3a4f;
+    border-radius: 8px;
+    height: 8px;
+    overflow: hidden;
+}
+.progress-bar-fill {
+    height: 8px;
+    border-radius: 8px;
+    background: #4c8bf5;
+    transition: width 0.4s ease;
+    width: 0%;
+}
+.progress-tabs {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    color: #555;
+}
+.progress-tab-item { transition: color 0.3s; }
+.progress-tab-item.done { color: #33cc66; }
+.progress-tab-item.loading { color: #4c8bf5; }
+
+/* School-locked banner */
+.school-locked-banner {
+    background: linear-gradient(90deg, #1a2a4a, #1e2d52);
+    border-bottom: 2px solid #4c8bf5;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: #aaa;
+}
+.school-locked-banner .school-name {
+    color: #fff;
+    font-weight: bold;
+    font-size: 16px;
+}
+.school-locked-badge {
+    background: #4c8bf5;
+    color: #fff;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-left: auto;
+}
+
 .tabs { display: flex; gap: 10px; padding: 8px 20px; flex-wrap: wrap; align-items: center; }
 .tabs-label { color: #aaa; font-size: 13px; min-width: 70px; }
 .tab { background: #2d2f40; padding: 8px 18px; border-radius: 6px; cursor: pointer; user-select: none; font-size: 14px; transition: background 0.2s; }
@@ -244,7 +293,7 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
 </head>
 <body>
 
-<header>📊 iReady Projected Proficiency Dashboard</header>
+<header id="mainHeader">📊 iReady Projected Proficiency Dashboard</header>
 
 <!-- SETUP INSTRUCTIONS -->
 <div class="config-banner" id="setupBanner" style="display:none;">
@@ -347,6 +396,16 @@ hr.divider { border: none; border-top: 1px solid #3a3a4f; margin: 4px 20px; }
 <div class="loading-screen" id="loadingScreen" style="display:none;">
     <div class="spinner"></div>
     <div id="loadingMsg">Loading data...</div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBarFill"></div></div>
+    <div class="progress-tabs" id="progressTabs">
+        <span class="progress-tab-item" id="pt_ELA_Fall">ELA Fall</span>
+        <span style="color:#333;">·</span>
+        <span class="progress-tab-item" id="pt_ELA_Winter">ELA Winter</span>
+        <span style="color:#333;">·</span>
+        <span class="progress-tab-item" id="pt_Math_Fall">Math Fall</span>
+        <span style="color:#333;">·</span>
+        <span class="progress-tab-item" id="pt_Math_Winter">Math Winter</span>
+    </div>
 </div>
 
 <script>
@@ -364,8 +423,10 @@ const TABS = [
 ];
 
 // ============================================================
-// STATE — raw student rows
+// URL PARAMETER — school lock
 // ============================================================
+const URL_PARAMS      = new URLSearchParams(window.location.search);
+const LOCKED_SCHOOL   = URL_PARAMS.get("school") || null; // e.g. ?school=Lincoln%20ES
 let rawStore = {
     ELA:  { Fall: [], Winter: [] },
     Math: { Fall: [], Winter: [] }
@@ -562,7 +623,7 @@ function getAllSubgroups(rows) {
 // ============================================================
 function populateSchoolFilter(rows) {
     const select = document.getElementById("schoolFilter");
-    const current = select.value;
+    const current = LOCKED_SCHOOL || select.value;
     const schools = [...new Set(rows.map(r => r["School"]))].filter(Boolean).sort();
     select.innerHTML = `<option value="ALL">All Schools</option>`;
     schools.forEach(s => {
@@ -571,6 +632,7 @@ function populateSchoolFilter(rows) {
         if (s === current) opt.selected = true;
         select.appendChild(opt);
     });
+    if (LOCKED_SCHOOL) select.value = LOCKED_SCHOOL;
 }
 
 function populateGradeFilter(rows) {
@@ -825,7 +887,7 @@ function buildStudentTable(rows) {
 }
 
 // ============================================================
-// LOAD DATA
+// LOAD DATA — parallel fetch for speed
 // ============================================================
 async function loadAllData() {
     if (SHEET_ID === "PLACEHOLDER_DISABLED") {
@@ -838,37 +900,57 @@ async function loadAllData() {
     document.getElementById("loadingScreen").style.display = "flex";
     document.getElementById("dashboardUI").style.display = "none";
 
+    // Apply school lock UI
+    if (LOCKED_SCHOOL) {
+        document.getElementById("mainHeader").textContent = `📊 iReady Dashboard`;
+        // Will insert banner after dashboardUI is shown
+    }
+
+    let completedCount = 0;
+    const totalTabs = TABS.length;
     const debugLines = [];
-    try {
-        for (const [subj, term, tabName] of TABS) {
-            document.getElementById("loadingMsg").textContent = `Loading ${tabName}...`;
-            try {
-                const rows = await fetchSheetTab(tabName);
-                rawStore[subj][term] = rows.filter(r => r["School"] && r["Student Grade"]);
-                debugLines.push(`✅ ${tabName}: ${rows.length} raw rows, ${rawStore[subj][term].length} valid students`);
-                if (rows.length > 0) {
-                    debugLines.push(`&nbsp;&nbsp;First row keys: ${Object.keys(rows[0]).slice(0,8).join(", ")}`);
-                    const profVal      = rows[0]["Proficiency if Student Shows No Additional Growth"] || rows[0]["Projected Proficiency"] || rows[0]["Proficiency"] || "NOT FOUND";
-                    const relVal       = rows[0]["Overall Relative Placement"] || "NOT FOUND";
-                    const placementVal = rows[0]["Overall Placement"] || "NOT FOUND";
-                    debugLines.push(`&nbsp;&nbsp;Sample: School="${rows[0]["School"]}" Grade="${rows[0]["Student Grade"]}"`);
-                    debugLines.push(`&nbsp;&nbsp;First Name="${rows[0]["First Name"] || "NOT FOUND"}" Last Name="${rows[0]["Last Name"] || "NOT FOUND"}"`);
-                    debugLines.push(`&nbsp;&nbsp;Proficiency col="${profVal}" | Relative Placement="${relVal}" | Overall Placement="${placementVal}"`);
-                    debugLines.push(`&nbsp;&nbsp;Computed level for first student: ${getProfLevel(rows[0])}`);
-                }
-            } catch(e) {
-                debugLines.push(`❌ ${tabName}: ${e.message}`);
+
+    // Mark a tab as loading
+    function setTabStatus(subj, term, status) {
+        const el = document.getElementById(`pt_${subj}_${term}`);
+        if (!el) return;
+        el.className = "progress-tab-item " + status;
+        if (status === "done") el.textContent = "✓ " + subj + " " + term;
+    }
+
+    // Fetch one tab and update progress
+    async function fetchAndStore(subj, term, tabName) {
+        setTabStatus(subj, term, "loading");
+        try {
+            const rows = await fetchSheetTab(tabName);
+            rawStore[subj][term] = rows.filter(r => r["School"] && r["Student Grade"]);
+            debugLines.push(`✅ ${tabName}: ${rows.length} raw rows, ${rawStore[subj][term].length} valid students`);
+            if (rows.length > 0) {
+                debugLines.push(`&nbsp;&nbsp;Sample: School="${rows[0]["School"]}" Grade="${rows[0]["Student Grade"]}"`);
+                debugLines.push(`&nbsp;&nbsp;First Name="${rows[0]["First Name"] || "NOT FOUND"}" Last Name="${rows[0]["Last Name"] || "NOT FOUND"}"`);
+                debugLines.push(`&nbsp;&nbsp;Computed level for first student: ${getProfLevel(rows[0])}`);
             }
+        } catch(e) {
+            debugLines.push(`❌ ${tabName}: ${e.message}`);
         }
+        completedCount++;
+        const pct = Math.round((completedCount / totalTabs) * 100);
+        document.getElementById("progressBarFill").style.width = pct + "%";
+        document.getElementById("loadingMsg").textContent = `Loading… ${pct}%`;
+        setTabStatus(subj, term, "done");
+    }
+
+    try {
+        // ── PARALLEL fetch all 4 tabs at once ──────────────────
+        await Promise.all(TABS.map(([subj, term, tabName]) => fetchAndStore(subj, term, tabName)));
 
         const debugBox = document.createElement("div");
         debugBox.style.cssText = "margin:6px 20px;font-size:12px;font-family:monospace;";
         const allOk = debugLines.every(l => !l.startsWith("❌"));
-        const statusIcon = allOk ? "✅" : "⚠️";
         debugBox.innerHTML = `
             <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'"
                  style="cursor:pointer;color:#555;padding:3px 0;user-select:none;font-size:11px;">
-                ${statusIcon} Data loaded — <span style="text-decoration:underline">show debug</span>
+                ${allOk ? "✅" : "⚠️"} Data loaded — <span style="text-decoration:underline">show debug</span>
             </div>
             <div style="display:none;background:#1a1a2e;border:1px solid #3a3a4f;border-radius:8px;padding:10px 14px;margin-top:4px;line-height:1.8;color:#aaa;">
                 ${debugLines.join("<br>")}
@@ -876,6 +958,36 @@ async function loadAllData() {
 
         document.getElementById("loadingScreen").style.display = "none";
         document.getElementById("dashboardUI").style.display = "block";
+
+        // ── School-locked UI tweaks ─────────────────────────────
+        if (LOCKED_SCHOOL) {
+            // Insert banner below header
+            const banner = document.createElement("div");
+            banner.className = "school-locked-banner";
+            banner.innerHTML = `
+                🏫 Viewing: <span class="school-name">${LOCKED_SCHOOL}</span>
+                <span class="school-locked-badge">🔒 School View</span>`;
+            document.getElementById("dashboardUI").insertAdjacentElement("afterbegin", banner);
+
+            // Pre-set & hide school filter
+            const sf = document.getElementById("schoolFilter");
+            // Populate first so the option exists
+            const allRows = Object.values(rawStore).flatMap(s => Object.values(s).flat());
+            populateSchoolFilter(allRows);
+            sf.value = LOCKED_SCHOOL;
+            sf.closest(".filter-bar").querySelector("label[for='schoolFilter'], label:last-of-type") && null;
+            // Hide school filter label + select
+            const filterBar = document.getElementById("schoolFilter").parentElement;
+            // Hide the school filter label and select via wrapper span
+            sf.style.display = "none";
+            // Find and hide the "Filter by School:" label too
+            const labels = filterBar.querySelectorAll("label");
+            labels.forEach(l => { if (l.textContent.includes("School")) l.style.display = "none"; });
+
+            // Default to Students view for principals
+            currentView = "Students";
+            updateActiveTabs("viewTabs", "Students");
+        }
 
         const dashContent = document.getElementById("dashboardContent");
         dashContent.parentNode.insertBefore(debugBox, dashContent);
@@ -940,7 +1052,7 @@ function renderDashboard() {
     populateSchoolFilter(rows);
 
     const subgroupVal = document.getElementById("subgroupFilter").value;
-    const schoolVal   = document.getElementById("schoolFilter").value;
+    const schoolVal   = LOCKED_SCHOOL || document.getElementById("schoolFilter").value;
 
     rows = applySubgroupFilter(rows, subgroupVal);
     rows = applySchoolFilter(rows, schoolVal);
